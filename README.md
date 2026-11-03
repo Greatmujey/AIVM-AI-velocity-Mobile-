@@ -1,6 +1,6 @@
 # AIVM — AI Velocity Mobile
 
-A small, original, touch-first 3D action-game prototype built with Three.js and Vite. Explore a compact city, drive a bike or car, use three weapons against AI enemies, and complete three short missions. This is a prototype—not a full open-world game.
+AIVM is an original, touch-first 3D city action **prototype**, built with Three.js and Vite. It is not a full GTA- or CODM-scale game. Explore a small city in third person, ride a bike or car, fight enemy bots with three weapons, and complete three short missions.
 
 ## Run locally
 
@@ -9,13 +9,13 @@ npm install
 npm run dev
 ```
 
-Open the URL printed by Vite on a computer or compatible mobile browser. `npm run build` creates a production build.
+Open the printed URL on a computer or compatible mobile browser. `npm run build` creates a production build. `npm test` tests navigation and collision math.
 
 ## Controls
 
-- **Mobile:** drag the left joystick to move or drive; hold **Fire** to shoot at the nearest enemy in range. Tap **Ride** near a vehicle to enter or exit; use **Weapon** and **Reload** for combat.
-- **Desktop:** WASD or arrow keys to move/drive, Space to fire, E to enter/exit, Q to switch weapons, R to reload.
-- Follow the green objective marker and minimap. Red minimap dots are enemies. Combat uses auto-aim; firing is disabled while riding.
+- **Mobile:** drag the left joystick to move. Drag an open area of the game view to look around. Hold **Fire** to auto-aim at the nearest visible enemy in range. Hold **Sprint** to run. Tap **Ride** near a vehicle to enter or exit. While driving, push the stick up/down to accelerate or reverse and left/right to steer. **Weapon** and **Reload** control your gun.
+- **Desktop:** WASD or arrow keys to move/drive, drag the game view to look, Space to fire, E to enter/exit, Q to switch weapons, R to reload, Shift to sprint.
+- Follow the green marker, distance indicator and minimap. Red minimap dots are enemies. Combat uses line-of-sight auto-aim; firing is disabled while riding. Health is partially restored between missions.
 
 ## Competition notes
 

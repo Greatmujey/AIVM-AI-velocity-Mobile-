@@ -1,0 +1,9 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { blocked, movePosition, hasLineOfSight, relativeMovement, objectiveDirection } from '../src/navigation.js';
+const blocks=[{x:10,z:10,halfX:3,halfZ:3}];
+test('buildings block movement and allow sliding along a wall',()=>{assert.equal(blocked(10,10,blocks),true);const p={x:6,z:6};movePosition(p,2,2,blocks);assert.equal(p.x,8);assert.equal(p.z,6)});
+test('movement is clamped at the edge of the city',()=>{const p={x:99,z:0};movePosition(p,10,0,blocks);assert.equal(p.x,100)});
+test('line of sight is blocked by buildings but clear around them',()=>{assert.equal(hasLineOfSight({x:0,z:10},{x:20,z:10},blocks),false);assert.equal(hasLineOfSight({x:0,z:4},{x:20,z:4},blocks),true);assert.equal(hasLineOfSight({x:10,z:0},{x:10,z:20},blocks),false)});
+test('movement tracks the direction of the camera',()=>{const p=relativeMovement(0,-1,Math.PI/2);assert.ok(Math.abs(p.x+1)<1e-8);assert.ok(Math.abs(p.z)<1e-8)});
+test('objective arrow points up when the target is ahead of a rotated camera',()=>{assert.ok(Math.abs(objectiveDirection(-10,0,Math.PI/2))<1e-8)});
