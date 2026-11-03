@@ -16,3 +16,18 @@ export function selectAimTarget(origin, cameraYaw, candidates, range, blocks, co
   }
   return best;
 }
+
+// Candidates have already been projected into viewport pixels by the renderer.
+// Prefer the target nearest the reticle, only within its visible body or a
+// small configurable assist radius. A candidate behind a wall cannot be hit.
+export function selectReticleTarget(candidates, assistPixels = 0) {
+  let best = null, bestScore = Infinity;
+  for (const candidate of candidates) {
+    if (!candidate.visible || !candidate.clear || candidate.distance > candidate.range) continue;
+    const distanceFromCenter = Math.hypot(candidate.x, candidate.y);
+    if (distanceFromCenter > candidate.bodyRadius + assistPixels) continue;
+    const score = distanceFromCenter / Math.max(1, candidate.bodyRadius) + candidate.distance * .001;
+    if (score < bestScore) { best = candidate.enemy; bestScore = score; }
+  }
+  return best;
+}

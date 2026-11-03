@@ -14,3 +14,14 @@
 @media(max-width:800px),(pointer:coarse){.bottom-right #aim-btn{right:0;bottom:137px}}
 @media(max-width:500px) and (orientation:portrait){.bottom-right #aim-btn{right:0;bottom:127px}.hitmarker{top:51%}}
 .sound-toggle{display:block;pointer-events:auto;margin:7px auto 0;padding:5px 8px;border:1px solid #ffffff40;background:#101b1bbf;color:#dce7d6;font:700 8px Inter,sans-serif;letter-spacing:.08em;border-radius:2px}.sound-toggle:hover{border-color:#c9fc51}
+/* Two-thumb combat: drag on the right fire button or use the optional left fire. */
+.left-fire{display:none;position:absolute;pointer-events:auto;left:max(18px,env(safe-area-inset-left));top:45%;width:54px;height:54px;background:#192420c9;color:#f3f8ed;border:1px solid #e8f3df9c}
+.left-fire .fire-icon{width:18px;height:18px}.left-fire .fire-icon:before{left:7px;height:22px}.left-fire .fire-icon:after{top:7px;width:22px}
+.settings-row{display:flex;gap:4px;justify-content:center;pointer-events:auto}.settings-row .sound-toggle{margin:6px 0 0}.sensitivity{display:flex;align-items:center;justify-content:center;gap:3px;pointer-events:auto;color:#dce7d6;font:700 8px Inter,sans-serif;letter-spacing:.08em;margin-top:5px}.sensitivity input{width:64px;accent-color:#c9fc51;touch-action:pan-x}
+.hud.driving .left-fire,.hud.driving #fire-btn,.hud.driving #aim-btn,.hud.driving #weapon-btn,.hud.driving #reload-btn,.hud.driving #sprint-btn{display:none}
+@media(max-width:800px),(pointer:coarse){.left-fire{display:flex}.bottom-right #fire-btn .lbl{font-size:7px;letter-spacing:0}.crosshair,.hitmarker{top:50%}}
+@media(max-height:500px) and (orientation:landscape){.left-fire{top:45%;left:max(16px,env(safe-area-inset-left))}.bottom-right #sprint-btn{left:125px;bottom:90px}.sensitivity input{width:48px}.settings-row .sound-toggle{padding:4px}}
+/* Keep every action reachable on shorter phones without overlapping the stick. */
+@media(max-width:360px) and (orientation:portrait){.top .heat{position:absolute;right:95px;top:0}.mission{max-width:165px}.mission h2{font-size:16px}.mission p{font-size:9px}.bottom-left{bottom:max(10px,env(safe-area-inset-bottom));left:16px}.status{width:135px}.ammo{font-size:23px}.left-fire{top:auto;bottom:230px;left:18px}.bottom-right #sprint-btn{left:88px;bottom:228px}.navigation{top:170px}}
+@media(max-height:350px) and (orientation:landscape){.left-fire{top:auto;left:190px;bottom:108px}.panel{padding:14px}.panel h1{font-size:42px}.panel-foot{font-size:9px}.feature-row{margin:7px 0}.panel .lead{font-size:10px}}
+@media(max-width:360px) and (orientation:portrait){.bottom-left .status{width:110px}.bottom-left{gap:7px}.bottom-left .ammo{font-size:20px}.top .heat{right:140px}}

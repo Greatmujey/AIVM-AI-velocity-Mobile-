@@ -13,9 +13,9 @@ Open the printed URL on a computer or compatible mobile browser. `npm run build`
 
 ## Controls
 
-- **Mobile:** drag the left joystick to move. Drag an open area of the game view to look around. Drag the camera toward an enemy and hold **Fire**; aim assist locks onto visible targets in a forward cone. Tap **Aim** to zoom in. Hold **Sprint** to run. Tap **Ride** near a vehicle to enter or exit. While driving, push the stick up/down to accelerate or reverse and left/right to steer. **Weapon** and **Reload** control your gun.
+- **Mobile:** drag the left joystick to move. Drag the open game view to look around. Hold and drag the right **Fire** button to aim while shooting, or use the left **Fire** button while looking with your right thumb. Tap **Aim** to zoom. Adjust **LOOK** sensitivity and turn **ASSIST** on or off above the minimap. Hold **Sprint** to run. Tap **Ride** near a vehicle to enter or exit. While driving, push the stick up/down to accelerate or reverse and left/right to steer. **Weapon** and **Reload** control your gun.
 - **Desktop:** WASD or arrow keys to move/drive, drag the game view to look, Space to fire, E to enter/exit, Q to switch weapons, R to reload, V or right-click to toggle aim, Shift to sprint.
-- Follow the green marker, distance indicator and minimap. The green GPS line follows the street network, and the arrow points to the next turn. Red minimap dots are enemies. Combat uses forward-cone, line-of-sight aim assist; firing is disabled while riding. Health is partially restored between missions.
+- Follow the green marker, distance indicator and minimap. The green GPS line follows the street network, and the arrow points to the next turn. Red minimap dots are enemies. Combat uses a small reticle-based, line-of-sight aim assist; firing is disabled while riding. Health is partially restored between missions.
 
 ## Competition notes
 
