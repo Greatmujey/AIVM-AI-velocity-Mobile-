@@ -1,17 +1,18 @@
 import * as THREE from 'three';
 import { createWorld } from './world.js';
-import { createModels, animatePerson, updateWeapon } from './models.js';
+import { createModels, animatePerson, animateAnimal, setHitFlash, updateWeapon } from './models.js';
 import { selectReticleTarget } from './combat.js';
 import { roadRoute } from './gps.js';
 import { drawFullMap } from './full-map.js';
 import { loadPreferences, savePreferences } from './preferences.js';
+import { advancePursuit } from './pursuit.js';
 import { movePosition, hasLineOfSight, relativeMovement, objectiveDirection } from './navigation.js';
 import './style.css';
 
 document.querySelector('#app').innerHTML = `
 <canvas id="game" aria-label="3D game view. Drag to look around."></canvas><div class="vignette"></div><div class="damage" id="damage"></div>
 <div class="hud" id="hud">
- <div class="top"><div><div class="brand"><div class="brand-icon">↗</div><div><div class="brand-name">AI<span>VM</span></div><div class="brand-sub">AI VELOCITY MOBILE</div></div></div><div class="mission"><div class="eyebrow" id="mission-number">MISSION 01 / 03</div><h2 id="mission-title">FIRST DELIVERY</h2><p id="objective">Get to the package. Follow the green marker.</p><div class="count" id="mission-count"></div></div></div><div class="right-hud"><div class="heat"><small>HEAT</small><strong id="heat">☆☆☆</strong></div><div><button class="map-wrap" id="open-map" aria-label="Open full city map" aria-haspopup="dialog"><canvas id="map" width="200" height="200"></canvas><span class="map-label">N ↑</span><span class="map-tap">TAP MAP</span></button><div class="map-note">● YOU &nbsp; ◆ GOAL &nbsp; — GPS</div><div class="settings-row"><button id="sound-toggle" class="sound-toggle" aria-label="Toggle sound" aria-pressed="true">SOUND ON</button><button id="assist-toggle" class="sound-toggle" aria-label="Toggle aim assist" aria-pressed="true">ASSIST ON</button></div><label class="sensitivity">LOOK <input id="sensitivity" type="range" min="1" max="10" value="5" aria-label="Look sensitivity"></label></div></div></div>
+ <div class="top"><div><div class="brand"><div class="brand-icon">↗</div><div><div class="brand-name">AI<span>VM</span></div><div class="brand-sub">AI VELOCITY MOBILE</div></div></div><div class="mission"><div class="eyebrow" id="mission-number">MISSION 01 / 03</div><h2 id="mission-title">FIRST DELIVERY</h2><p id="objective">Take the bike and pick up the package.</p><div class="count" id="mission-count"></div></div></div><div class="right-hud"><div class="heat"><small>HEAT</small><strong id="heat">☆☆☆</strong></div><div><button class="map-wrap" id="open-map" aria-label="Open full city map" aria-haspopup="dialog"><canvas id="map" width="200" height="200"></canvas><span class="map-label">N ↑</span><span class="map-tap">TAP MAP</span></button><div class="map-note">● YOU &nbsp; ◆ GOAL &nbsp; — GPS</div><div class="settings-row"><button id="sound-toggle" class="sound-toggle" aria-label="Toggle sound" aria-pressed="true">SOUND ON</button><button id="assist-toggle" class="sound-toggle" aria-label="Toggle aim assist" aria-pressed="true">ASSIST ON</button></div><label class="sensitivity">LOOK <input id="sensitivity" type="range" min="1" max="10" value="5" aria-label="Look sensitivity"></label></div></div></div>
  <div class="navigation"><span id="direction-arrow">▲</span><span id="distance">0 M</span><small>OBJECTIVE</small></div><div class="crosshair" id="crosshair"><i></i><i></i><i></i><i></i></div><div class="target-name" id="target-name"></div><div class="hitmarker" id="hitmarker">×</div>
  <div class="bottom-left"><div class="status"><div class="status-top"><span class="status-label">HEALTH</span><span class="health-num" id="health">100</span></div><div class="health-track"><div class="health-fill" id="health-fill"></div></div><div class="weapon-name" id="weapon">PISTOL</div><div class="weapon-sub" id="weapon-sub">AIM ASSIST ON</div><div class="reload-track" id="reload-track" role="progressbar" aria-label="Reload progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="reload-fill"></div></div></div><div class="ammo" id="ammo">12 <small>/ ∞</small></div></div>
  <button class="action left-fire" id="left-fire-btn" aria-label="Fire with left hand"><span class="ico fire-icon"></span><span class="lbl">FIRE</span></button>
@@ -43,7 +44,22 @@ const player=world.person(0x819d4d);scene.add(player);player.position.set(0,0,13
 const vehicles=[world.vehicle('car',4,10),world.vehicle('bike',-4,10)];vehicles.forEach(v=>models.vehicle(v));
 // Lightweight ambient traffic and pedestrians bring the district to life.
 const traffic=[{x:3,z:-28,dir:-1},{x:31,z:46,dir:-1},{x:-31,z:-55,dir:1},{x:59,z:15,dir:1}].map(t=>{const car=world.vehicle('car',t.x,t.z);car.mesh.rotation.y=t.dir>0?Math.PI:0;models.vehicle(car);return {...t,car}});
-const civilians=[{x:7.1,z:-13,dir:-1},{x:-20.9,z:25,dir:1},{x:35.1,z:-38,dir:1},{x:-48.9,z:45,dir:-1}].map((c,i)=>{const mesh=world.person(0x718b94);mesh.position.set(c.x,0,c.z);scene.add(mesh);models.person(mesh,i%2?'civilian-female':'civilian');return {...c,mesh,walk:i}});
+const civilians=[{x:7.1,z:-13,dir:-1},{x:-20.9,z:25,dir:1},{x:35.1,z:-38,dir:1},{x:-48.9,z:45,dir:-1}].map((c,i)=>{const mesh=world.person(0x718b94);mesh.position.set(c.x,0,c.z);scene.add(mesh);models.person(mesh,['civilian','civilian-female','civilian-warm','civilian-dark'][i]);return {...c,mesh,walk:i}});
+// Ambient animals stay on the sidewalk, wander independently and flee nearby gunfire.
+const animals=[{type:'dog',x:7.2,z:-6,dir:-1,lo:-19,hi:-3},{type:'cat',x:-7.4,z:4,dir:-1,lo:-9,hi:9},{type:'dog',x:35.3,z:-40,dir:1,lo:-48,hi:-31},{type:'cat',x:-48.7,z:42,dir:-1,lo:34,hi:50}].map((a,i)=>{const mesh=new THREE.Group();mesh.position.set(a.x,0,a.z);scene.add(mesh);models.animal(mesh,a.type);return {...a,mesh,clock:i*2}});
+function pigeon(x,z){
+ const g=new THREE.Group(),feather=new THREE.MeshStandardMaterial({color:0x8c9997,roughness:.9}),dark=new THREE.MeshStandardMaterial({color:0x4c5b5c}),beak=new THREE.MeshStandardMaterial({color:0xb29b70});
+ const body=new THREE.Mesh(new THREE.SphereGeometry(.24,8,6),feather);body.scale.set(.8,.7,1.35);body.position.y=.33;g.add(body);
+ const head=new THREE.Mesh(new THREE.SphereGeometry(.13,7,6),dark);head.position.set(0,.49,-.24);g.add(head);const bill=new THREE.Mesh(new THREE.ConeGeometry(.045,.18,5),beak);bill.rotation.x=-Math.PI/2;bill.position.set(0,.46,-.4);g.add(bill);g.position.set(x,0,z);scene.add(g);return g;
+}
+const birds=[{mesh:pigeon(7.4,-4),start:-4,dir:1},{mesh:pigeon(-7.5,7),start:7,dir:-1}];
+function updateAnimals(dt,pos){
+ for(const animal of animals){const distance=animal.mesh.position.distanceTo(pos),flee=fireHeld&&distance<20;animal.clock+=dt;const moving=flee||animal.clock%9<6;const p=animal.mesh.position;
+  if(flee)animal.dir=p.z<pos.z?-1:1;if(p.z<animal.lo)animal.dir=1;if(p.z>animal.hi)animal.dir=-1;
+  if(moving)p.z+=animal.dir*(flee?2.8:1.05)*dt;animal.mesh.rotation.y=animal.dir>0?0:Math.PI;animateAnimal(animal.mesh,moving,dt);
+ }
+ for(const bird of birds){const p=bird.mesh.position,alert=fireHeld&&p.distanceTo(pos)<18;if(Math.abs(p.z-bird.start)>2)bird.dir*=-1;p.z+=bird.dir*(alert?1.8:.3)*dt;bird.mesh.rotation.y=bird.dir>0?Math.PI:0;}
+}
 function updateCity(dt,playerPos){
  for(const t of traffic){const p=t.car.mesh.position;const near=Math.hypot(p.x-playerPos.x,p.z-playerPos.z)<9;const speed=near?0:5;p.z+=t.dir*speed*dt;if(p.z>99)p.z=-99;if(p.z< -99)p.z=99;for(const wheel of t.car.wheels)wheel.rotation.x-=speed*dt*.8}
  for(const c of civilians){const p=c.mesh.position,close=fireHeld&&Math.hypot(p.x-playerPos.x,p.z-playerPos.z)<22;if(close)c.dir=p.z<playerPos.z?-1:1;p.z+=c.dir*(close?4:1.5)*dt;if(p.z>90){p.z=90;c.dir=-1}if(p.z< -90){p.z=-90;c.dir=1}c.mesh.rotation.y=c.dir>0?Math.PI:0;c.walk+=dt;animateWalk(c.mesh,close?1:.5,c.walk,dt)}
@@ -56,7 +72,7 @@ const diamond=new THREE.Mesh(new THREE.OctahedronGeometry(.8),lime);diamond.posi
 const weapons=[{name:'PISTOL',cap:12,rate:.32,damage:34,range:28},{name:'ASSAULT RIFLE',cap:30,rate:.12,damage:18,range:34},{name:'SHOTGUN',cap:6,rate:.7,damage:68,range:19}];
 const ammo=weapons.map(w=>w.cap),enemies=[],shots=[],keys={};
 let storage=null;try{storage=window.localStorage}catch{}const preferences=loadPreferences(storage);
-let mapOpen=false;
+let mapOpen=false, rival=null, dropKills=0;
 let vehicle=null, vehicleSpeed=0, health=100, mission=0, phase=0, kills=0, heat=0, started=false, ended=false, fireHeld=false, sprintHeld=false, aiming=false, aimAssist=preferences.aimAssist, lookSensitivity=preferences.lookSensitivity;
 const firePointers=new Set(),inputResets=[];let keyboardFire=false,gasHeld=false,brakeHeld=false,weaponMenuOpen=false;
 let lastShot=-1,lastReinforcement=0,weaponIndex=0,reloadEnd=0,toastTimer=0,gameTime=0,cameraYaw=0,lookPitch=0, joy={x:0,y:0}, audio=null, muted=preferences.muted, walkCycle=0;
@@ -86,10 +102,22 @@ function spawnEnemy(x,z,kind='guard'){
  models.person(mesh,'enemy');enemies.push({mesh,bar,fill,hp:100,cooldown:1.2+Math.random(),alive:true,walk:Math.random()*4,stuck:0,kind,shootUntil:0});
 }
 function restoreHealth(){health=Math.min(100,health+35)}
+function removeRival(){if(!rival)return;scene.remove(rival.car.mesh);rival=null}
+function startRival(){removeRival();const car=world.vehicle('car',0,-40);models.vehicle(car,0x94504c);rival={car,route:[],nextRoute:0,nextShot:gameTime+4}}
+function updateRival(dt){
+ if(!rival||mission!==0||phase!==1)return;const pos=vehicle?vehicle.mesh.position:player.position,enemy=rival.car.mesh.position;
+ const distance=Math.hypot(pos.x-enemy.x,pos.z-enemy.z);
+ if(gameTime>=rival.nextRoute){rival.route=roadRoute(enemy,pos);rival.nextRoute=gameTime+.8}
+ if(distance>8){const facing=advancePursuit(enemy,rival.route,dt,world.blocks,11);if(facing!==null)rival.car.mesh.rotation.y=facing;for(const wheel of rival.car.wheels)wheel.rotation.x-=11*dt*.8}
+ if(distance<22&&gameTime>=rival.nextShot&&hasLineOfSight(enemy,pos,world.blocks)){rival.nextShot=gameTime+3;hit(vehicle?3:4);addTracer(enemy.clone().add(new THREE.Vector3(0,2,0)),pos.clone().add(new THREE.Vector3(0,1.5,0)),0xff866d)}
+}
+function beginSecondMission(){mission=1;phase=0;target=objectives[2];heat=1;restoreHealth();spawnEnemy(-28,-33);spawnEnemy(-33,-28);spawnEnemy(-23,-28);spawnEnemy(-28,-23);setObjective('THE AMBUSH','Reach the stolen case. Eliminate the guards.',2,'GUARDS DOWN  0 / 4');showToast('DELIVERY COMPLETE  ·  HEALTH RESTORED');sound('success')}
+
 function updateMission(){
  const pos=vehicle?vehicle.mesh.position:player.position,dist=Math.hypot(pos.x-target.x,pos.z-target.z);
- if(mission===0&&phase===0&&dist<4.5){phase=1;target=objectives[1];heat=1;spawnEnemy(-3,-46,'pursuer');spawnEnemy(3,-46,'pursuer');setObjective('FIRST DELIVERY','Package secured. Escape the ambush and reach the drop.',1);showToast('AMBUSH!  ·  GET TO THE DROP');sound('success')}
- else if(mission===0&&phase===1&&dist<5){mission=1;phase=0;target=objectives[2];heat=1;restoreHealth();spawnEnemy(-28,-33);spawnEnemy(-33,-28);spawnEnemy(-23,-28);spawnEnemy(-28,-23);setObjective('THE AMBUSH','Reach the stolen case. Eliminate the guards.',2,'GUARDS DOWN  0 / 4');showToast('MISSION COMPLETE  ·  HEALTH RESTORED');sound('success')}
+ if(mission===0&&phase===0&&dist<4.5){phase=1;target=objectives[1];heat=1;startRival();setObjective('FIRST DELIVERY','Rival car on your tail! Ride to the drop.',1,'PURSUIT ACTIVE');showToast('RIVAL IN PURSUIT  ·  GET TO THE DROP');sound('success')}
+ else if(mission===0&&phase===1&&dist<5){phase=2;removeRival();dropKills=0;spawnEnemy(56,-42,'drop-guard');spawnEnemy(42,-28,'drop-guard');spawnEnemy(70,-28,'drop-guard');setObjective('DROP ZONE','Exit your ride and clear the attackers.',1,'ATTACKERS DOWN  0 / 3');showToast('AMBUSH AT THE DROP  ·  CLEAR THE AREA');sound('success')}
+ else if(mission===0&&phase===2&&dropKills>=3){beginSecondMission()}
  else if(mission===1&&phase===0&&kills>=4){phase=1;setObjective('THE AMBUSH','Area clear. Collect the case at the marker.',2,'GUARDS DOWN  4 / 4');showToast('AREA CLEAR  ·  COLLECT THE CASE');sound('success')}
  else if(mission===1&&phase===1&&dist<4.5){phase=2;target=objectives[3];setObjective('THE AMBUSH','Case secured. Take it to the contact.',2);showToast('CASE SECURED  ·  GET TO THE CONTACT');sound('success')}
  else if(mission===1&&phase===2&&dist<5){mission=2;phase=0;target=objectives[4];heat=2;restoreHealth();spawnEnemy(25,20,'pursuer');spawnEnemy(31,20,'pursuer');spawnEnemy(28,37,'pursuer');lastReinforcement=gameTime;setObjective('HOT RUN','Get to the safe house. Expect resistance.',3);showToast('FINAL JOB  ·  HEALTH RESTORED');sound('success')}
@@ -102,13 +130,13 @@ function updateMission(){
 function finish(won){if(ended)return;ended=true;resetInputs();setWeaponMenu(false);$('end-kicker').textContent=won?'ALL THREE MISSIONS COMPLETE':'MISSION FAILED';$('end-title').innerHTML=won?'RUN <span>COMPLETE.</span>':'DOWN <span>OUT.</span>';$('end-text').textContent=won?'You made the delivery, recovered the case, and escaped the city. Nice work.':'Retry this mission with full health and ammo, or start the whole run again.';$('retry').hidden=won;$('restart').textContent=won?'PLAY AGAIN':'START OVER';$('end').classList.remove('hidden')}
 function retryMission(){
  if(!ended)return;
- resetInputs();for(const enemy of enemies)scene.remove(enemy.mesh);enemies.length=0;
+ resetInputs();removeRival();for(const enemy of enemies)scene.remove(enemy.mesh);enemies.length=0;
  for(const shot of shots){scene.remove(shot.line);shot.line.geometry.dispose();shot.line.material.dispose()}shots.length=0;
  if(vehicle){vehicle.occupied=false;if(vehicle.rider)vehicle.rider.visible=false}vehicle=null;vehicleSpeed=0;player.visible=true;
  const start=[{x:0,z:13},{x:56,z:-28},{x:28,z:28}][mission];player.position.set(start.x,0,start.z);player.rotation.y=0;
  vehicles.forEach((v,i)=>{v.mesh.position.set(start.x+(i===0?4:-4),0,start.z-3);v.mesh.rotation.y=0;v.occupied=false;if(v.rider)v.rider.visible=false});
- health=100;phase=0;kills=0;reloadEnd=0;lastShot=-1;ammo.forEach((_,i)=>ammo[i]=weapons[i].cap);aiming=false;updateAimButton();cameraYaw=0;lookPitch=0;
- if(mission===0){target=objectives[0];heat=0;setObjective('FIRST DELIVERY','Get to the package. Follow the green marker.',1)}
+ health=100;phase=0;kills=0;dropKills=0;reloadEnd=0;lastShot=-1;ammo.forEach((_,i)=>ammo[i]=weapons[i].cap);aiming=false;updateAimButton();cameraYaw=0;lookPitch=0;
+ if(mission===0){target=objectives[0];heat=0;setObjective('FIRST DELIVERY','Take the bike and pick up the package.',1)}
  else if(mission===1){target=objectives[2];heat=1;spawnEnemy(-28,-33);spawnEnemy(-33,-28);spawnEnemy(-23,-28);spawnEnemy(-28,-23);setObjective('THE AMBUSH','Reach the stolen case. Eliminate the guards.',2,'GUARDS DOWN  0 / 4')}
  else {target=objectives[4];heat=2;spawnEnemy(25,20,'pursuer');spawnEnemy(31,20,'pursuer');spawnEnemy(28,37,'pursuer');lastReinforcement=gameTime;setObjective('HOT RUN','Get to the safe house. Expect resistance.',3)}
  routeTarget=null;currentRoute=roadRoute(player.position,target);marker.position.set(target.x,0,target.z);camera.position.set(start.x,5.2,start.z+8);$('end').classList.add('hidden');ended=false;showToast('MISSION RESTARTED  ·  FULL HEALTH & AMMO');updateMap();
@@ -135,8 +163,8 @@ function nearestTarget(){
 }
 function addTracer(from,to,color){const geo=new THREE.BufferGeometry().setFromPoints([from,to]);const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color}));scene.add(line);shots.push({line,until:gameTime+.09})}
 function damageEnemy(enemy,amount){
- if(!enemy.alive)return;enemy.hp-=amount;enemy.mesh.userData.torso.material.emissive.setHex(0x8d2b18);setTimeout(()=>enemy.mesh.userData.torso.material.emissive.setHex(0),100);$('hitmarker').classList.add('active');setTimeout(()=>$('hitmarker').classList.remove('active'),100);
- if(enemy.hp<=0){enemy.alive=false;scene.remove(enemy.mesh);if(mission===1&&phase===0&&enemy.kind==='guard'){kills++;$('mission-count').textContent=`GUARDS DOWN  ${Math.min(kills,4)} / 4`}}
+ if(!enemy.alive)return;enemy.hp-=amount;setHitFlash(enemy.mesh,true);setTimeout(()=>setHitFlash(enemy.mesh,false),100);$('hitmarker').classList.add('active');setTimeout(()=>$('hitmarker').classList.remove('active'),100);
+ if(enemy.hp<=0){enemy.alive=false;scene.remove(enemy.mesh);if(mission===0&&phase===2&&enemy.kind==='drop-guard'){dropKills++;$('mission-count').textContent=`ATTACKERS DOWN  ${Math.min(dropKills,3)} / 3`}if(mission===1&&phase===0&&enemy.kind==='guard'){kills++;$('mission-count').textContent=`GUARDS DOWN  ${Math.min(kills,4)} / 4`}}
 }
 function shoot(){
  const w=weapons[weaponIndex];if(vehicle||reloadEnd||gameTime-lastShot<w.rate)return;if(ammo[weaponIndex]<=0){reload();return}lastShot=gameTime;ammo[weaponIndex]--;sound('shot');
@@ -159,13 +187,13 @@ function updateMap(){
  for(let i=-84;i<=84;i+=28){ctx.fillStyle='#465451';ctx.fillRect((i-pos.x)*scale-16,-100,32,200);ctx.fillRect(-100,(i-pos.z)*scale-16,200,32)}
  if(currentRoute.length>1){ctx.strokeStyle='#c9fc51';ctx.lineWidth=3;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();currentRoute.forEach((point,i)=>{const x=(point.x-pos.x)*scale,z=(point.z-pos.z)*scale;if(i===0)ctx.moveTo(x,z);else ctx.lineTo(x,z)});ctx.stroke()}
  ctx.fillStyle='#c9fc51';let tx=(target.x-pos.x)*scale,tz=(target.z-pos.z)*scale;const length=Math.hypot(tx,tz);if(length>83){tx=tx/length*83;tz=tz/length*83}ctx.save();ctx.translate(tx,tz);ctx.rotate(Math.PI/4);ctx.fillRect(-6,-6,12,12);ctx.restore();
- ctx.fillStyle='#ff806d';for(const e of enemies){if(!e.alive)continue;const x=(e.mesh.position.x-pos.x)*scale,z=(e.mesh.position.z-pos.z)*scale;if(Math.hypot(x,z)<90){ctx.beginPath();ctx.arc(x,z,3,0,Math.PI*2);ctx.fill()}}
+ ctx.fillStyle='#ff806d';if(rival){const rp=rival.car.mesh.position,x=(rp.x-pos.x)*scale,z=(rp.z-pos.z)*scale;if(Math.hypot(x,z)<90){ctx.beginPath();ctx.arc(x,z,5,0,Math.PI*2);ctx.fill()}}for(const e of enemies){if(!e.alive)continue;const x=(e.mesh.position.x-pos.x)*scale,z=(e.mesh.position.z-pos.z)*scale;if(Math.hypot(x,z)<90){ctx.beginPath();ctx.arc(x,z,3,0,Math.PI*2);ctx.fill()}}
  ctx.save();ctx.rotate(-cameraYaw);ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(0,-9);ctx.lineTo(6,7);ctx.lineTo(0,4);ctx.lineTo(-6,7);ctx.closePath();ctx.fill();ctx.restore();ctx.restore();
 }
 function setMapOpen(open){
  if(open&&(!started||ended))return;
  mapOpen=open; $('map-overlay').hidden=!open;
- if(open){resetInputs();setWeaponMenu(false);const position=vehicle?vehicle.mesh.position:player.position;currentRoute=roadRoute(position,target);drawFullMap($('full-map'),{blocks:world.blocks,position,target,route:currentRoute,enemies,vehicles,cameraYaw});$('close-map').focus()}
+ if(open){resetInputs();setWeaponMenu(false);const position=vehicle?vehicle.mesh.position:player.position;currentRoute=roadRoute(position,target);drawFullMap($('full-map'),{blocks:world.blocks,position,target,route:currentRoute,enemies:rival?[...enemies,{alive:true,mesh:rival.car.mesh}]:enemies,vehicles,cameraYaw});$('close-map').focus()}
  else {$('open-map').focus()}
 }
 $('open-map').onclick=()=>setMapOpen(true);$('close-map').onclick=()=>setMapOpen(false);
@@ -215,7 +243,7 @@ function animate(){requestAnimationFrame(animate);const elapsed=clock.getDelta()
   }else{
    const move=relativeMovement(inputX,inputZ,cameraYaw);if(len>.08){const speed=(sprintHeld||keys.ShiftLeft||keys.ShiftRight)?10:6.3;movePosition(player.position,move.x*speed*dt,move.z*speed*dt,world.blocks);if(!fireHeld&&!aiming)player.rotation.y=Math.atan2(-move.x,-move.z);walkCycle+=dt*(speed/6.3)}animateWalk(player,Math.min(len,1),walkCycle,dt,fireHeld);
   }
-  if(aiming&&!vehicle)player.rotation.y=cameraYaw;if(fireHeld)shoot();if(reloadEnd&&gameTime>=reloadEnd){ammo[weaponIndex]=weapons[weaponIndex].cap;reloadEnd=0}updateEnemies(dt);if(!ended)updateMission();if(!ended)updateCity(dt,vehicle?vehicle.mesh.position:player.position);if(!ended&&mission===2&&gameTime-lastReinforcement>16&&enemies.filter(e=>e.alive&&e.kind==='pursuer').length<5){const p=vehicle?vehicle.mesh.position:player.position;const z=Math.round(p.z/28)*28;const x=Math.max(-84,Math.min(84,Math.round(p.x/28)*28+(p.x<target.x?-28:28)));spawnEnemy(x,z,'pursuer');lastReinforcement=gameTime;showToast('ENEMY REINFORCEMENTS INBOUND')}
+  if(aiming&&!vehicle)player.rotation.y=cameraYaw;if(fireHeld)shoot();if(reloadEnd&&gameTime>=reloadEnd){ammo[weaponIndex]=weapons[weaponIndex].cap;reloadEnd=0}updateEnemies(dt);if(!ended)updateMission();if(!ended)updateRival(dt);if(!ended){const cityPos=vehicle?vehicle.mesh.position:player.position;updateCity(dt,cityPos);updateAnimals(dt,cityPos);}if(!ended&&mission===2&&gameTime-lastReinforcement>16&&enemies.filter(e=>e.alive&&e.kind==='pursuer').length<5){const p=vehicle?vehicle.mesh.position:player.position;const z=Math.round(p.z/28)*28;const x=Math.max(-84,Math.min(84,Math.round(p.x/28)*28+(p.x<target.x?-28:28)));spawnEnemy(x,z,'pursuer');lastReinforcement=gameTime;showToast('ENEMY REINFORCEMENTS INBOUND')}
   for(let i=shots.length-1;i>=0;i--)if(shots[i].until<gameTime){scene.remove(shots[i].line);shots[i].line.geometry.dispose();shots[i].line.material.dispose();shots.splice(i,1)}
   $('hud').classList.toggle('driving',!!vehicle);$('health').textContent=Math.ceil(health);$('health-fill').style.width=health+'%';$('health-fill').style.background=health<30?'#ff6b59':'#c9fc51';$('weapon').textContent=vehicle?vehicle.type.toUpperCase():weapons[weaponIndex].name;$('weapon-sub').textContent=vehicle?`${Math.round(Math.abs(vehicleSpeed)*5)} KM/H · TAP EXIT`:reloadEnd?'RELOADING...':aimAssist?'AIM ASSIST ON':'MANUAL AIM';$('ammo').innerHTML=vehicle?'—':`${ammo[weaponIndex]} <small>/ ∞</small>`;const reloading=!!reloadEnd&&!vehicle;$('reload-track').classList.toggle('visible',reloading);const reloadProgress=reloading?Math.round(Math.max(0,Math.min(1,1-(reloadEnd-gameTime)))*100):0;$('reload-fill').style.width=reloadProgress+'%';$('reload-track').setAttribute('aria-valuenow',String(reloadProgress));$('reload-btn').classList.toggle('selected',reloading);
   const near=vehicle||vehicles.some(v=>player.position.distanceTo(v.mesh.position)<5);$('interact-btn').style.display=near?'':'none';$('interact-btn').querySelector('.lbl').textContent=vehicle?'EXIT':'RIDE';$('interact-btn').setAttribute('aria-label',vehicle?'Exit vehicle':'Enter nearby vehicle');$('interaction').style.display='none';
@@ -231,10 +259,11 @@ function animate(){requestAnimationFrame(animate);const elapsed=clock.getDelta()
 // Test-only controls let automated browser checks exercise the real mission state machine.
 if(import.meta.env.DEV) window.__aivmTest={
   warp(x,z){const p=vehicle?vehicle.mesh.position:player.position;p.set(x,0,z);if(vehicle)player.position.copy(p);vehicleSpeed=0},
-  state(){const pos=vehicle?vehicle.mesh.position:player.position;return {mission,phase,kills,health,vehicle:vehicle?.type||null,weapon:weapons[weaponIndex].name,ammo:ammo[weaponIndex],ammoAll:[...ammo],reloading:!!reloadEnd,gasHeld,brakeHeld,weaponMenuOpen,mapOpen,ended,x:pos.x,z:pos.z,cameraYaw,lookPitch,aiming,fireHeld,assist:aimAssist}},
+  state(){const pos=vehicle?vehicle.mesh.position:player.position;return {mission,phase,kills,health,vehicle:vehicle?.type||null,weapon:weapons[weaponIndex].name,ammo:ammo[weaponIndex],ammoAll:[...ammo],reloading:!!reloadEnd,gasHeld,brakeHeld,weaponMenuOpen,mapOpen,dropKills,rival:rival?{x:rival.car.mesh.position.x,z:rival.car.mesh.position.z}:null,ended,x:pos.x,z:pos.z,cameraYaw,lookPitch,aiming,fireHeld,assist:aimAssist}},
   health(value){health=value},
   fail(){health=0;finish(false)},
-  defeatGuards(){enemies.filter(e=>e.alive&&e.kind==='guard').forEach(e=>damageEnemy(e,100))},
+  defeatGuards(){enemies.filter(e=>e.alive&&(e.kind==='guard'||e.kind==='drop-guard')).forEach(e=>damageEnemy(e,100))},
+  animalStatus(){return animals.map(a=>({type:a.type,x:a.mesh.position.x,z:a.mesh.position.z,loaded:!!a.mesh.userData.animalAnimation}))},
   renderInfo(){return {calls:renderer.info.render.calls,triangles:renderer.info.render.triangles}},
   targets(){return enemies.filter(e=>e.alive).map(e=>{const p=e.mesh.position.clone().add(new THREE.Vector3(0,1.8,0)).project(camera);return {x:(p.x+1)*innerWidth/2,y:(1-p.y)*innerHeight/2,hp:e.hp,kind:e.kind}})}
 };

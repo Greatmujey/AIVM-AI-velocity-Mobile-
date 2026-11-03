@@ -97,6 +97,15 @@ export function createWorld(scene) {
     else if(z>=-14||seed%3===0)store(x,z,seed);
     else apartment(x,z,seed);
   }
+  // A handcrafted gateway and original street mural give the opening block an identity.
+  const muralTexture=texLoader.load(`${import.meta.env.BASE_URL}assets/neighborhood-mural.jpg`);muralTexture.colorSpace=THREE.SRGBColorSpace;
+  const muralMaterial=new THREE.MeshStandardMaterial({map:muralTexture,roughness:.92});
+  box(.08,2.7,8.2,muralMaterial,-8.05,2.6,-14,scene,false);
+  const gateCanvas=document.createElement('canvas');gateCanvas.width=512;gateCanvas.height=128;const gc=gateCanvas.getContext('2d');gc.fillStyle='#e8d2ab';gc.fillRect(0,0,512,128);gc.strokeStyle='#8b563c';gc.lineWidth=10;gc.strokeRect(5,5,502,118);gc.fillStyle='#315750';gc.textAlign='center';gc.font='bold 55px sans-serif';gc.fillText('PALM GROVE',256,83);
+  const gateTexture=new THREE.CanvasTexture(gateCanvas);gateTexture.colorSpace=THREE.SRGBColorSpace;const gateSign=new THREE.MeshStandardMaterial({map:gateTexture,roughness:.85});
+  for(const side of [-1,1]){box(.35,6.7,.35,wood,side*8,3.35,0,scene,false);box(1.1,.5,1.1,concrete,side*8,.35,0,scene,false)}
+  box(16.5,.3,.35,wood,0,6.65,0,scene,false);box(8,1.65,.18,gateSign,0,6.5,.2,scene,false);
+  for(let x=-7;x<=7;x+=2)box(.18,.18,.18,glow,x,6.25,.25,scene,false);
   // Lamps and small street furniture, clear of the main driving lanes.
   for(let x=-84;x<=84;x+=28)for(let z=-84;z<=84;z+=28){
     if((x+z)%56===0){box(.16,5.5,.16,trim,x+6.6,2.75,z+6.6,scene,false);box(1.4,.12,.16,trim,x+6,5.4,z+6.6,scene,false);box(.55,.12,.4,glow,x+5.4,5.3,z+6.6,scene,false)}

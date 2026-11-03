@@ -13,9 +13,9 @@ This is an inspiration and implementation note, not a claim that we reproduced a
 
 ## What is implemented in AIVM
 
-- Animated CC0 human models and vehicle models, plus civilian and traffic ambience.
+- Animated CC0 human models with varied civilian and hostile palettes, CC0 dog and cat models, procedural pigeons, and civilian and traffic ambience.
 - Camera-relative movement, a zoomed aiming mode, reticle-based optional aim assist, cover/line-of-sight checks, hit markers and weapon audio.
-- A first-delivery ambush, hostile guards, final-mission reinforcements, and a street-network GPS route.
+- A delivery with a rival-car pursuit and a drop-zone shootout, hostile guards, final-mission reinforcements, and a street-network GPS route. The chase works with a bike, car or on foot; it is a small scripted prototype rather than a full police simulation.
 - An original coastal neighbourhood inspired by the broader look of urban open-world games: homes, storefronts, palms, utility lines and warmer lighting. It remains a stylized, small-scale prototype.
 
 ## Honest limitations / next priorities
