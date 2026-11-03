@@ -16,6 +16,7 @@ This is an inspiration and implementation note, not a claim that we reproduced a
 - Animated CC0 human models and vehicle models, plus civilian and traffic ambience.
 - Camera-relative movement, a zoomed aiming mode, reticle-based optional aim assist, cover/line-of-sight checks, hit markers and weapon audio.
 - A first-delivery ambush, hostile guards, final-mission reinforcements, and a street-network GPS route.
+- An original coastal neighbourhood inspired by the broader look of urban open-world games: homes, storefronts, palms, utility lines and warmer lighting. It remains a stylized, small-scale prototype.
 
 ## Honest limitations / next priorities
 

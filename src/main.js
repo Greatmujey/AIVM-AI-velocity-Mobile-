@@ -25,10 +25,12 @@ const canvas = $('game');
 const renderer = new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.35));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.13;
-const scene = new THREE.Scene();scene.background=new THREE.Color(0xb1c3c0);scene.fog=new THREE.Fog(0xb1c3c0,70,180);
+const scene = new THREE.Scene();
+// A warm coastal sky and haze give the district an afternoon identity.
+const sky=document.createElement('canvas');sky.width=16;sky.height=256;const skyCtx=sky.getContext('2d');const skyGradient=skyCtx.createLinearGradient(0,0,0,256);skyGradient.addColorStop(0,'#78afc7');skyGradient.addColorStop(.5,'#bed0c7');skyGradient.addColorStop(1,'#f4c899');skyCtx.fillStyle=skyGradient;skyCtx.fillRect(0,0,16,256);const skyTexture=new THREE.CanvasTexture(sky);skyTexture.colorSpace=THREE.SRGBColorSpace;scene.background=skyTexture;scene.fog=new THREE.Fog(0xd1c7ac,85,185);
 const camera=new THREE.PerspectiveCamera(58,1,.1,280);
-scene.add(new THREE.HemisphereLight(0xe2f3f1,0x51585a,2));
-const sun=new THREE.DirectionalLight(0xffdfb5,2.5);sun.position.set(-35,75,30);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-38,right:38,top:38,bottom:-38,far:160});sun.shadow.bias=-.0005;scene.add(sun,sun.target);
+scene.add(new THREE.HemisphereLight(0xd8ebf3,0x786b56,1.9));
+const sun=new THREE.DirectionalLight(0xffd3a1,2.5);sun.position.set(-35,75,30);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-38,right:38,top:38,bottom:-38,far:160});sun.shadow.bias=-.0005;scene.add(sun,sun.target);
 const world=createWorld(scene), models=createModels(renderer);
 const player=world.person(0x819d4d);scene.add(player);player.position.set(0,0,13);models.person(player,'player');
 const vehicles=[world.vehicle('car',4,10),world.vehicle('bike',-4,10)];vehicles.forEach(v=>models.vehicle(v));
