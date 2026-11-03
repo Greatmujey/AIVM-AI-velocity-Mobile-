@@ -11,10 +11,10 @@ export function createWorld(scene) {
   const glass = mat(0x668a9b, {metalness:.35, roughness:.25});
   const glow = new THREE.MeshBasicMaterial({color:0xd7f977});
   const red = new THREE.MeshBasicMaterial({color:0xef6e55});
-  const blocks = [], buildingMeshes = [];
+  const blocks = [], buildingMeshes = [], staticBoxes = []; let collectingStatic = true;
   function box(w,h,d,m,x,y,z,parent=scene,shadow=true) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);
-    mesh.position.set(x,y,z); mesh.castShadow=shadow; mesh.receiveShadow=true; parent.add(mesh); return mesh;
+    mesh.position.set(x,y,z); mesh.castShadow=shadow; mesh.receiveShadow=true; parent.add(mesh); if(collectingStatic&&parent===scene&&!shadow)staticBoxes.push(mesh); return mesh;
   }
   box(390,.4,390,mat(0x6e7970),0,-.3,0,scene,false);
   const markGeometry = new THREE.BoxGeometry(.13,.025,2.2);
@@ -126,6 +126,22 @@ export function createWorld(scene) {
   const cable=mat(0x403c36);for(let z=-56;z<=56;z+=28){box(.16,7,.16,wood,-6.8,3.5,z,scene,false);box(1.4,.14,.14,wood,-6.8,6.7,z,scene,false);if(z<56)box(.05,.05,28,cable,-6.8,6.7,z+14,scene,false)}
   // Distant silhouettes frame the horizon without affecting navigation.
   const skyline=mat(0x667b81);for(let i=0;i<32;i++){const a=i/32*Math.PI*2,dist=145,h=18+(i*19%38);box(13,h,13,skyline,Math.sin(a)*dist,h/2,Math.cos(a)*dist,scene,false)}
+  // Batch decorative static boxes by material and 56m cell, retaining frustum
+  // culling and leaving collision/raycast building meshes untouched.
+  collectingStatic=false;
+  const batches=new Map();
+  for(const mesh of staticBoxes){
+    const key=`${mesh.material.uuid}:${Math.floor(mesh.position.x/56)}:${Math.floor(mesh.position.z/56)}`;
+    if(!batches.has(key))batches.set(key,[]);batches.get(key).push(mesh);
+  }
+  const unitBox=new THREE.BoxGeometry(1,1,1),instanceHelper=new THREE.Object3D();
+  for(const meshes of batches.values()){
+    if(meshes.length<2)continue;
+    const instances=new THREE.InstancedMesh(unitBox,meshes[0].material,meshes.length);instances.receiveShadow=true;
+    meshes.forEach((mesh,i)=>{const {width,height,depth}=mesh.geometry.parameters;instanceHelper.position.copy(mesh.position);instanceHelper.scale.set(width,height,depth);instanceHelper.updateMatrix();instances.setMatrixAt(i,instanceHelper.matrix);scene.remove(mesh);mesh.geometry.dispose()});
+    instances.computeBoundingSphere();scene.add(instances);
+  }
+  staticBoxes.length=0;batches.clear();
   function person(color) {
     const g=new THREE.Group(), jacket=mat(color), pants=mat(0x202e35), skin=mat(0xa97e65), vest=mat(0x253139);
     const torso=box(1.15,1.4,.58,jacket,0,1.8,0,g);

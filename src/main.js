@@ -4,6 +4,7 @@ import { createModels, animatePerson, updateWeapon } from './models.js';
 import { selectReticleTarget } from './combat.js';
 import { roadRoute } from './gps.js';
 import { drawFullMap } from './full-map.js';
+import { loadPreferences, savePreferences } from './preferences.js';
 import { movePosition, hasLineOfSight, relativeMovement, objectiveDirection } from './navigation.js';
 import './style.css';
 
@@ -24,7 +25,7 @@ document.querySelector('#app').innerHTML = `
  <div class="map-legend"><strong>LEGEND</strong><span><b class="legend-you">▲</b> YOU</span><span><b class="legend-goal">◆</b> OBJECTIVE</span><span><b class="legend-route">━</b> GPS ROUTE</span><span><b class="legend-enemy">●</b> ENEMY</span><span><b class="legend-vehicle">■</b> VEHICLE</span><small>GAME PAUSED<br>North is up.</small></div></div></div>
 </div>
 <div class="screen" id="intro"><div class="panel"><div class="panel-kicker">AI VELOCITY MOBILE · CITY ACTION PROTOTYPE</div><h1>AI<span>VM.</span></h1><div class="lead">A city full of opportunities. A delivery gone wrong. Three jobs stand between you and a clean getaway.</div><div class="feature-row"><span>THIRD-PERSON ACTION</span><span>BIKE + CAR</span><span>03 MISSIONS</span></div><button class="primary" id="start">ENTER THE CITY &nbsp; ↗</button><p class="panel-foot"><b>Mobile:</b> Move with the left stick. Drag the right side to look. Hold and drag the right FIRE button to aim while shooting; the left FIRE button also shoots. Tap AIM to zoom and RIDE near a vehicle. Tap the minimap to see the whole city. In a vehicle, steer with the stick and hold GAS or BRAKE; the stick also supports driving.<br><b>Desktop:</b> WASD to move or drive, drag to look, SPACE to fire, V to aim, E to ride, Q to switch, R to reload, M for map, SHIFT to sprint.</p></div></div>
-<div class="screen hidden" id="end"><div class="panel"><div class="panel-kicker" id="end-kicker">MISSION REPORT</div><h1 id="end-title">RUN <span>COMPLETE.</span></h1><div class="lead" id="end-text"></div><div class="feature-row"><span>THANKS FOR PLAYING</span><span>PROTOTYPE BUILD</span></div><button class="primary" id="restart">PLAY AGAIN &nbsp; ↗</button></div></div>`;
+<div class="screen hidden" id="end"><div class="panel"><div class="panel-kicker" id="end-kicker">MISSION REPORT</div><h1 id="end-title">RUN <span>COMPLETE.</span></h1><div class="lead" id="end-text"></div><div class="feature-row"><span>THANKS FOR PLAYING</span><span>PROTOTYPE BUILD</span></div><button class="primary" id="retry">RETRY MISSION &nbsp; ↗</button><button class="secondary" id="restart">START OVER</button></div></div>`;
 
 const $ = id => document.getElementById(id);
 const canvas = $('game');
@@ -54,10 +55,11 @@ const diamond=new THREE.Mesh(new THREE.OctahedronGeometry(.8),lime);diamond.posi
 
 const weapons=[{name:'PISTOL',cap:12,rate:.32,damage:34,range:28},{name:'ASSAULT RIFLE',cap:30,rate:.12,damage:18,range:34},{name:'SHOTGUN',cap:6,rate:.7,damage:68,range:19}];
 const ammo=weapons.map(w=>w.cap),enemies=[],shots=[],keys={};
+let storage=null;try{storage=window.localStorage}catch{}const preferences=loadPreferences(storage);
 let mapOpen=false;
-let vehicle=null, vehicleSpeed=0, health=100, mission=0, phase=0, kills=0, heat=0, started=false, ended=false, fireHeld=false, sprintHeld=false, aiming=false, aimAssist=true, lookSensitivity=5;
+let vehicle=null, vehicleSpeed=0, health=100, mission=0, phase=0, kills=0, heat=0, started=false, ended=false, fireHeld=false, sprintHeld=false, aiming=false, aimAssist=preferences.aimAssist, lookSensitivity=preferences.lookSensitivity;
 const firePointers=new Set(),inputResets=[];let keyboardFire=false,gasHeld=false,brakeHeld=false,weaponMenuOpen=false;
-let lastShot=-1,lastReinforcement=0,weaponIndex=0,reloadEnd=0,toastTimer=0,gameTime=0,cameraYaw=0,lookPitch=0, joy={x:0,y:0}, audio=null, muted=false, walkCycle=0;
+let lastShot=-1,lastReinforcement=0,weaponIndex=0,reloadEnd=0,toastTimer=0,gameTime=0,cameraYaw=0,lookPitch=0, joy={x:0,y:0}, audio=null, muted=preferences.muted, walkCycle=0;
 const objectives=[{x:0,z:-56},{x:56,z:-28},{x:-28,z:-28},{x:28,z:28},{x:-56,z:28}];let target=objectives[0], currentRoute=[], routeTarget=null, nextRouteUpdate=0;
 const raycaster=new THREE.Raycaster(), cameraDesired=new THREE.Vector3(), cameraFocus=new THREE.Vector3();
 
@@ -97,7 +99,20 @@ function updateMission(){
  const waypoint=currentRoute.find((point,index)=>index>0&&Math.hypot(point.x-pos.x,point.z-pos.z)>3)||target;
  const dx=target.x-pos.x,dz=target.z-pos.z;const angle=objectiveDirection(waypoint.x-pos.x,waypoint.z-pos.z,cameraYaw);$('direction-arrow').style.transform=`rotate(${angle}rad)`;$('distance').textContent=`${Math.round(Math.hypot(dx,dz))} M`;
 }
-function finish(won){if(ended)return;ended=true;resetInputs();$('end-kicker').textContent=won?'ALL THREE MISSIONS COMPLETE':'MISSION FAILED';$('end-title').innerHTML=won?'RUN <span>COMPLETE.</span>':'DOWN <span>OUT.</span>';$('end-text').textContent=won?'You made the delivery, recovered the case, and escaped the city. Nice work.':'The city got the better of you this time. Get back in and try a different route.';$('end').classList.remove('hidden')}
+function finish(won){if(ended)return;ended=true;resetInputs();setWeaponMenu(false);$('end-kicker').textContent=won?'ALL THREE MISSIONS COMPLETE':'MISSION FAILED';$('end-title').innerHTML=won?'RUN <span>COMPLETE.</span>':'DOWN <span>OUT.</span>';$('end-text').textContent=won?'You made the delivery, recovered the case, and escaped the city. Nice work.':'Retry this mission with full health and ammo, or start the whole run again.';$('retry').hidden=won;$('restart').textContent=won?'PLAY AGAIN':'START OVER';$('end').classList.remove('hidden')}
+function retryMission(){
+ if(!ended)return;
+ resetInputs();for(const enemy of enemies)scene.remove(enemy.mesh);enemies.length=0;
+ for(const shot of shots){scene.remove(shot.line);shot.line.geometry.dispose();shot.line.material.dispose()}shots.length=0;
+ if(vehicle){vehicle.occupied=false;if(vehicle.rider)vehicle.rider.visible=false}vehicle=null;vehicleSpeed=0;player.visible=true;
+ const start=[{x:0,z:13},{x:56,z:-28},{x:28,z:28}][mission];player.position.set(start.x,0,start.z);player.rotation.y=0;
+ vehicles.forEach((v,i)=>{v.mesh.position.set(start.x+(i===0?4:-4),0,start.z-3);v.mesh.rotation.y=0;v.occupied=false;if(v.rider)v.rider.visible=false});
+ health=100;phase=0;kills=0;reloadEnd=0;lastShot=-1;ammo.forEach((_,i)=>ammo[i]=weapons[i].cap);aiming=false;updateAimButton();cameraYaw=0;lookPitch=0;
+ if(mission===0){target=objectives[0];heat=0;setObjective('FIRST DELIVERY','Get to the package. Follow the green marker.',1)}
+ else if(mission===1){target=objectives[2];heat=1;spawnEnemy(-28,-33);spawnEnemy(-33,-28);spawnEnemy(-23,-28);spawnEnemy(-28,-23);setObjective('THE AMBUSH','Reach the stolen case. Eliminate the guards.',2,'GUARDS DOWN  0 / 4')}
+ else {target=objectives[4];heat=2;spawnEnemy(25,20,'pursuer');spawnEnemy(31,20,'pursuer');spawnEnemy(28,37,'pursuer');lastReinforcement=gameTime;setObjective('HOT RUN','Get to the safe house. Expect resistance.',3)}
+ routeTarget=null;currentRoute=roadRoute(player.position,target);marker.position.set(target.x,0,target.z);camera.position.set(start.x,5.2,start.z+8);$('end').classList.add('hidden');ended=false;showToast('MISSION RESTARTED  ·  FULL HEALTH & AMMO');updateMap();
+}
 function setWeaponMenu(open){weaponMenuOpen=!!open&&!vehicle&&started&&!ended;const menu=$('weapon-menu');menu.hidden=!weaponMenuOpen;$('weapon-btn').setAttribute('aria-expanded',String(weaponMenuOpen));if(weaponMenuOpen)renderWeaponMenu()}
 function renderWeaponMenu(){const menu=$('weapon-menu');menu.innerHTML='';weapons.forEach((w,i)=>{const button=document.createElement('button');button.className='weapon-option'+(i===weaponIndex?' selected':'');button.setAttribute('aria-label',`${w.name}, ${ammo[i]} rounds${i===weaponIndex?', equipped':''}`);button.innerHTML=`<span>${w.name}</span><small>${ammo[i]} / ${w.cap}</small>`;button.addEventListener('click',()=>equipWeapon(i));menu.appendChild(button)})}
 function equipWeapon(index){if(!started||ended||vehicle||index<0||index>=weapons.length)return;setWeaponMenu(false);if(index===weaponIndex)return;weaponIndex=index;updateWeapon(player,weaponIndex);reloadEnd=0;showToast(weapons[weaponIndex].name+' EQUIPPED')}
@@ -119,10 +134,14 @@ function nearestTarget(){
  return selectReticleTarget(candidates,aimAssist?Math.min(innerWidth,innerHeight)*(aiming?.045:.065):0);
 }
 function addTracer(from,to,color){const geo=new THREE.BufferGeometry().setFromPoints([from,to]);const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color}));scene.add(line);shots.push({line,until:gameTime+.09})}
+function damageEnemy(enemy,amount){
+ if(!enemy.alive)return;enemy.hp-=amount;enemy.mesh.userData.torso.material.emissive.setHex(0x8d2b18);setTimeout(()=>enemy.mesh.userData.torso.material.emissive.setHex(0),100);$('hitmarker').classList.add('active');setTimeout(()=>$('hitmarker').classList.remove('active'),100);
+ if(enemy.hp<=0){enemy.alive=false;scene.remove(enemy.mesh);if(mission===1&&phase===0&&enemy.kind==='guard'){kills++;$('mission-count').textContent=`GUARDS DOWN  ${Math.min(kills,4)} / 4`}}
+}
 function shoot(){
  const w=weapons[weaponIndex];if(vehicle||reloadEnd||gameTime-lastShot<w.rate)return;if(ammo[weaponIndex]<=0){reload();return}lastShot=gameTime;ammo[weaponIndex]--;sound('shot');
  player.rotation.y=cameraYaw;const enemy=nearestTarget(),from=player.position.clone().add(new THREE.Vector3(0,2,0));let to;
- if(enemy){to=enemy.mesh.position.clone().add(new THREE.Vector3(0,1.8,0));player.rotation.y=Math.atan2(from.x-to.x,from.z-to.z);enemy.hp-=w.damage;enemy.mesh.userData.torso.material.emissive.setHex(0x8d2b18);setTimeout(()=>enemy.mesh.userData.torso.material.emissive.setHex(0),100);$('hitmarker').classList.add('active');setTimeout(()=>$('hitmarker').classList.remove('active'),100);if(enemy.hp<=0){enemy.alive=false;scene.remove(enemy.mesh);if(mission===1&&phase===0&&enemy.kind==='guard'){kills++;$('mission-count').textContent=`GUARDS DOWN  ${Math.min(kills,4)} / 4`}}}
+ if(enemy){to=enemy.mesh.position.clone().add(new THREE.Vector3(0,1.8,0));player.rotation.y=Math.atan2(from.x-to.x,from.z-to.z);damageEnemy(enemy,w.damage)}
  else {const aimRay=new THREE.Raycaster();aimRay.setFromCamera(new THREE.Vector2(0,0),camera);aimRay.far=w.range;const wall=aimRay.intersectObjects(world.buildingMeshes,false)[0];to=wall?wall.point:aimRay.ray.at(w.range,new THREE.Vector3())}addTracer(from,to,0xf8ffb0);const flash=new THREE.Mesh(new THREE.SphereGeometry(.18,6,4),new THREE.MeshBasicMaterial({color:0xffe58b}));flash.position.copy(from).lerp(to,.06);scene.add(flash);shots.push({line:flash,until:gameTime+.06});
  $('crosshair').classList.remove('shot');void $('crosshair').offsetWidth;$('crosshair').classList.add('shot');
 }
@@ -154,7 +173,9 @@ function resize(){renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWi
 window.addEventListener('keydown',e=>{if(e.code==='Escape'&&mapOpen){e.preventDefault();setMapOpen(false);return}if(e.code==='KeyM'&&!e.repeat){e.preventDefault();setMapOpen(!mapOpen);return}if(mapOpen)return;if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();if(e.repeat)return;keys[e.code]=true;if(e.code==='KeyE')interact();if(e.code==='KeyQ')switchWeapon();if(e.code==='KeyR')reload();if(e.code==='KeyV')toggleAim();if(e.code==='Space'){keyboardFire=true;updateFire();if(started&&!ended&&!vehicle)shoot()}if(e.code==='Escape')setWeaponMenu(false)});
 window.addEventListener('keyup',e=>{keys[e.code]=false;if(e.code==='Space'){keyboardFire=false;updateFire()}});
 window.addEventListener('blur',resetInputs);document.addEventListener('visibilitychange',()=>{if(document.hidden)resetInputs()});
-$('start').onclick=()=>{started=true;$('intro').classList.add('hidden');try{audio=new (window.AudioContext||window.webkitAudioContext)();audio.resume();prepareAudio()}catch{}showToast('FOLLOW THE GREEN MARKER')};$('restart').onclick=()=>location.reload();$('interact-btn').onclick=interact;$('weapon-btn').onclick=()=>setWeaponMenu(!weaponMenuOpen);$('reload-btn').onclick=reload;$('aim-btn').onclick=toggleAim;$('sound-toggle').onclick=()=>{muted=!muted;$('sound-toggle').textContent=muted?'SOUND OFF':'SOUND ON';$('sound-toggle').setAttribute('aria-pressed',String(!muted))};$('assist-toggle').onclick=()=>{aimAssist=!aimAssist;$('assist-toggle').textContent=aimAssist?'ASSIST ON':'ASSIST OFF';$('assist-toggle').setAttribute('aria-pressed',String(aimAssist))};$('sensitivity').oninput=e=>{lookSensitivity=Number(e.target.value)};
+$('start').onclick=()=>{started=true;$('intro').classList.add('hidden');try{audio=new (window.AudioContext||window.webkitAudioContext)();audio.resume();prepareAudio()}catch{}showToast('FOLLOW THE GREEN MARKER')};$('retry').onclick=retryMission;$('restart').onclick=()=>location.reload();$('interact-btn').onclick=interact;$('weapon-btn').onclick=()=>setWeaponMenu(!weaponMenuOpen);$('reload-btn').onclick=reload;$('aim-btn').onclick=toggleAim;function updateSettings(){ $('sound-toggle').textContent=muted?'SOUND OFF':'SOUND ON';$('sound-toggle').setAttribute('aria-pressed',String(!muted));$('assist-toggle').textContent=aimAssist?'ASSIST ON':'ASSIST OFF';$('assist-toggle').setAttribute('aria-pressed',String(aimAssist));$('sensitivity').value=lookSensitivity; }
+function persistSettings(){savePreferences(storage,{muted,aimAssist,lookSensitivity})}
+$('sound-toggle').onclick=()=>{muted=!muted;updateSettings();persistSettings()};$('assist-toggle').onclick=()=>{aimAssist=!aimAssist;updateSettings();persistSettings()};$('sensitivity').oninput=e=>{lookSensitivity=Number(e.target.value);persistSettings()};updateSettings();
 function updateAimButton(){$('aim-btn').classList.toggle('selected',aiming);$('aim-btn').setAttribute('aria-pressed',String(aiming));$('crosshair').classList.toggle('aiming',aiming)}
 function toggleAim(){if(!started||ended||vehicle)return;aiming=!aiming;updateAimButton()}
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
@@ -181,8 +202,8 @@ canvas.addEventListener('pointerdown',e=>{if(e.button===2){toggleAim();return}if
 canvas.addEventListener('pointermove',e=>{if(e.pointerId!==lookPointer)return;applyLook(e.clientX-lastLookX,e.clientY-lastLookY);lastLookX=e.clientX;lastLookY=e.clientY});
 function endLook(e){if(e.pointerId===lookPointer)lookPointer=null}canvas.addEventListener('pointerup',endLook);canvas.addEventListener('pointercancel',endLook);canvas.addEventListener('lostpointercapture',endLook);
 const clock=new THREE.Clock();let mapTick=0;
-function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);if(mapOpen)return;
- if(started&&!ended){gameTime+=dt;
+function animate(){requestAnimationFrame(animate);const elapsed=clock.getDelta(),dt=Math.min(elapsed,.05);if(mapOpen)return;
+ if(started&&!ended){gameTime+=Math.min(elapsed,.25);
   let inputX=joy.x+(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0),inputZ=joy.y+(keys.KeyS||keys.ArrowDown?1:0)-(keys.KeyW||keys.ArrowUp?1:0);const len=Math.hypot(inputX,inputZ);if(len>1){inputX/=len;inputZ/=len}
   if(vehicle){
    const pedal=(gasHeld?1:0)-(brakeHeld?1:0);const acceleration=(gasHeld||brakeHeld)?pedal:-inputZ;vehicleSpeed+=acceleration*(vehicle.type==='bike'?18:14)*dt;vehicleSpeed*=Math.exp(-(Math.abs(acceleration)>.1?.8:2.5)*dt);vehicleSpeed=THREE.MathUtils.clamp(vehicleSpeed,-6,vehicle.type==='bike'?19:15);
@@ -194,7 +215,7 @@ function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDel
   }else{
    const move=relativeMovement(inputX,inputZ,cameraYaw);if(len>.08){const speed=(sprintHeld||keys.ShiftLeft||keys.ShiftRight)?10:6.3;movePosition(player.position,move.x*speed*dt,move.z*speed*dt,world.blocks);if(!fireHeld&&!aiming)player.rotation.y=Math.atan2(-move.x,-move.z);walkCycle+=dt*(speed/6.3)}animateWalk(player,Math.min(len,1),walkCycle,dt,fireHeld);
   }
-  if(aiming&&!vehicle)player.rotation.y=cameraYaw;if(fireHeld)shoot();if(reloadEnd&&gameTime>=reloadEnd){ammo[weaponIndex]=weapons[weaponIndex].cap;reloadEnd=0}updateEnemies(dt);updateMission();updateCity(dt,vehicle?vehicle.mesh.position:player.position);if(mission===2&&gameTime-lastReinforcement>16&&enemies.filter(e=>e.alive&&e.kind==='pursuer').length<5){const p=vehicle?vehicle.mesh.position:player.position;const z=Math.round(p.z/28)*28;const x=Math.max(-84,Math.min(84,Math.round(p.x/28)*28+(p.x<target.x?-28:28)));spawnEnemy(x,z,'pursuer');lastReinforcement=gameTime;showToast('ENEMY REINFORCEMENTS INBOUND')}
+  if(aiming&&!vehicle)player.rotation.y=cameraYaw;if(fireHeld)shoot();if(reloadEnd&&gameTime>=reloadEnd){ammo[weaponIndex]=weapons[weaponIndex].cap;reloadEnd=0}updateEnemies(dt);if(!ended)updateMission();if(!ended)updateCity(dt,vehicle?vehicle.mesh.position:player.position);if(!ended&&mission===2&&gameTime-lastReinforcement>16&&enemies.filter(e=>e.alive&&e.kind==='pursuer').length<5){const p=vehicle?vehicle.mesh.position:player.position;const z=Math.round(p.z/28)*28;const x=Math.max(-84,Math.min(84,Math.round(p.x/28)*28+(p.x<target.x?-28:28)));spawnEnemy(x,z,'pursuer');lastReinforcement=gameTime;showToast('ENEMY REINFORCEMENTS INBOUND')}
   for(let i=shots.length-1;i>=0;i--)if(shots[i].until<gameTime){scene.remove(shots[i].line);shots[i].line.geometry.dispose();shots[i].line.material.dispose();shots.splice(i,1)}
   $('hud').classList.toggle('driving',!!vehicle);$('health').textContent=Math.ceil(health);$('health-fill').style.width=health+'%';$('health-fill').style.background=health<30?'#ff6b59':'#c9fc51';$('weapon').textContent=vehicle?vehicle.type.toUpperCase():weapons[weaponIndex].name;$('weapon-sub').textContent=vehicle?`${Math.round(Math.abs(vehicleSpeed)*5)} KM/H · TAP EXIT`:reloadEnd?'RELOADING...':aimAssist?'AIM ASSIST ON':'MANUAL AIM';$('ammo').innerHTML=vehicle?'—':`${ammo[weaponIndex]} <small>/ ∞</small>`;const reloading=!!reloadEnd&&!vehicle;$('reload-track').classList.toggle('visible',reloading);const reloadProgress=reloading?Math.round(Math.max(0,Math.min(1,1-(reloadEnd-gameTime)))*100):0;$('reload-fill').style.width=reloadProgress+'%';$('reload-track').setAttribute('aria-valuenow',String(reloadProgress));$('reload-btn').classList.toggle('selected',reloading);
   const near=vehicle||vehicles.some(v=>player.position.distanceTo(v.mesh.position)<5);$('interact-btn').style.display=near?'':'none';$('interact-btn').querySelector('.lbl').textContent=vehicle?'EXIT':'RIDE';$('interact-btn').setAttribute('aria-label',vehicle?'Exit vehicle':'Enter nearby vehicle');$('interaction').style.display='none';
@@ -212,6 +233,9 @@ if(import.meta.env.DEV) window.__aivmTest={
   warp(x,z){const p=vehicle?vehicle.mesh.position:player.position;p.set(x,0,z);if(vehicle)player.position.copy(p);vehicleSpeed=0},
   state(){const pos=vehicle?vehicle.mesh.position:player.position;return {mission,phase,kills,health,vehicle:vehicle?.type||null,weapon:weapons[weaponIndex].name,ammo:ammo[weaponIndex],ammoAll:[...ammo],reloading:!!reloadEnd,gasHeld,brakeHeld,weaponMenuOpen,mapOpen,ended,x:pos.x,z:pos.z,cameraYaw,lookPitch,aiming,fireHeld,assist:aimAssist}},
   health(value){health=value},
+  fail(){health=0;finish(false)},
+  defeatGuards(){enemies.filter(e=>e.alive&&e.kind==='guard').forEach(e=>damageEnemy(e,100))},
+  renderInfo(){return {calls:renderer.info.render.calls,triangles:renderer.info.render.triangles}},
   targets(){return enemies.filter(e=>e.alive).map(e=>{const p=e.mesh.position.clone().add(new THREE.Vector3(0,1.8,0)).project(camera);return {x:(p.x+1)*innerWidth/2,y:(1-p.y)*innerHeight/2,hp:e.hp,kind:e.kind}})}
 };
 marker.position.set(target.x,0,target.z);camera.position.set(0,5.2,21);currentRoute=roadRoute(player.position,target);updateMap();animate();

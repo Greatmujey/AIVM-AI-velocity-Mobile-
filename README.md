@@ -9,13 +9,13 @@ npm install
 npm run dev
 ```
 
-Open the printed URL on a computer or compatible mobile browser. `npm run build` creates a production build. `npm test` tests navigation and collision math.
+Open the printed URL on a computer or compatible mobile browser. `npm run build` creates a production build. `npm test` tests navigation, combat, map, collision math and saved settings.
 
 ## Controls
 
-- **Mobile:** drag the left joystick to move. Drag the open game view to look around. Hold and drag the right **Fire** button to aim while shooting, or use the left **Fire** button while looking with your right thumb. Tap **Aim** to toggle zoom. A quick tap on either fire button fires immediately; holding fires repeatedly. Adjust **LOOK** sensitivity and turn **ASSIST** on or off above the minimap. Hold **Sprint** to run. Tap the minimap for the full city map; the game pauses until you close it. Tap **Ride** near a vehicle to enter or exit. While driving, steer with the left stick and hold **Gas** or **Brake** (hold Brake to reverse); the stick also supports forward/reverse. Tap **Weapon** to pick a specific gun. Tap **Reload** to reload, or reload automatically when empty; the progress bar shows the reload. Switching weapons or entering a vehicle cancels a reload.
+- **Mobile:** drag the left joystick to move. Drag the open game view to look around. Hold and drag the right **Fire** button to aim while shooting, or use the left **Fire** button while looking with your right thumb. Tap **Aim** to toggle zoom. A quick tap on either fire button fires immediately; holding fires repeatedly. Adjust **LOOK** sensitivity and turn **ASSIST** or sound on or off above the minimap. These settings are saved on your device when browser storage is available. Hold **Sprint** to run. Tap the minimap for the full city map; the game pauses until you close it. Tap **Ride** near a vehicle to enter or exit. While driving, steer with the left stick and hold **Gas** or **Brake** (hold Brake to reverse); the stick also supports forward/reverse. Tap **Weapon** to pick a specific gun. Tap **Reload** to reload, or reload automatically when empty; the progress bar shows the reload. Switching weapons or entering a vehicle cancels a reload.
 - **Desktop:** WASD or arrow keys to move/drive, drag the game view to look, Space to fire, E to enter/exit, Q to switch weapons, R to reload, V or right-click to toggle aim, M to open/close the full map, Shift to sprint.
-- Follow the green marker, distance indicator and minimap. The green GPS line follows the street network, and the arrow points to the next turn. Red minimap dots are enemies. Combat uses a small reticle-based, line-of-sight aim assist; firing is disabled while riding. Health is partially restored between missions.
+- Follow the green marker, distance indicator and minimap. The green GPS line follows the street network, and the arrow points to the next turn. Red minimap dots are enemies. Combat uses a small reticle-based, line-of-sight aim assist; firing is disabled while riding. Health is partially restored between missions. If you fail, retry the current mission with full health and ammo or start the run over.
 
 ## Competition notes
 
