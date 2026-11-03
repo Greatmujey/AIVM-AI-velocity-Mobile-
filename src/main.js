@@ -251,11 +251,11 @@ function animate(){requestAnimationFrame(animate);const elapsed=clock.getDelta()
   const locked=!vehicle&&nearestTarget();$('crosshair').classList.toggle('locked',!!locked);$('target-name').textContent=locked?'TARGET LOCKED':'';
   if((mapTick+=dt)>.1){updateMap();mapTick=0}
  }
- const pos=vehicle?vehicle.mesh.position:player.position,dist=vehicle?11:(aiming?5.8:8.5),height=(vehicle?5.4:(aiming?3.15:3.7));
- const shoulder=vehicle?0:1.05,forwardX=-Math.sin(cameraYaw),forwardZ=-Math.cos(cameraYaw),rightX=Math.cos(cameraYaw),rightZ=-Math.sin(cameraYaw);
+ const pos=vehicle?vehicle.mesh.position:player.position,dist=vehicle?11:(aiming?5.3:6.7),height=(vehicle?5.4:(aiming?2.9:3.35));
+ const shoulder=vehicle?0:1.2,forwardX=-Math.sin(cameraYaw),forwardZ=-Math.cos(cameraYaw),rightX=Math.cos(cameraYaw),rightZ=-Math.sin(cameraYaw);
  cameraFocus.set(pos.x,vehicle?1.5:1.65,pos.z);cameraDesired.set(pos.x+Math.sin(cameraYaw)*dist+rightX*shoulder,height,pos.z+Math.cos(cameraYaw)*dist+rightZ*shoulder);
  const cameraRay=cameraDesired.clone().sub(cameraFocus),rayLength=cameraRay.length();raycaster.set(cameraFocus,cameraRay.normalize());raycaster.far=rayLength;const intersections=raycaster.intersectObjects(world.buildingMeshes,false);if(intersections.length)cameraDesired.copy(cameraFocus).addScaledVector(cameraRay,Math.max(.7,intersections[0].distance-.5));
- camera.position.lerp(cameraDesired,1-Math.exp(-dt*(aiming||fireHeld?18:12)));const lookTarget=cameraFocus.clone().add(new THREE.Vector3(forwardX*(vehicle?0:7)+rightX*shoulder,.4-lookPitch*12,forwardZ*(vehicle?0:7)+rightZ*shoulder));camera.lookAt(lookTarget);const fov=aiming&&!vehicle?43:58;if(Math.abs(camera.fov-fov)>.05){camera.fov=THREE.MathUtils.lerp(camera.fov,fov,Math.min(1,dt*8));camera.updateProjectionMatrix()}sun.position.set(pos.x-35,75,pos.z+30);sun.target.position.set(pos.x,0,pos.z);diamond.rotation.y+=dt;diamond.position.y=4+Math.sin(performance.now()*.003)*.3;ring.rotation.z+=dt*.25;renderer.render(scene,camera);
+ camera.position.lerp(cameraDesired,1-Math.exp(-dt*(aiming||fireHeld?18:12)));const lookTarget=cameraFocus.clone().add(new THREE.Vector3(forwardX*(vehicle?0:7)+rightX*shoulder,.4-lookPitch*12,forwardZ*(vehicle?0:7)+rightZ*shoulder));camera.lookAt(lookTarget);const fov=aiming&&!vehicle?43:55;if(Math.abs(camera.fov-fov)>.05){camera.fov=THREE.MathUtils.lerp(camera.fov,fov,Math.min(1,dt*8));camera.updateProjectionMatrix()}sun.position.set(pos.x-35,75,pos.z+30);sun.target.position.set(pos.x,0,pos.z);diamond.rotation.y+=dt;diamond.position.y=4+Math.sin(performance.now()*.003)*.3;ring.rotation.z+=dt*.25;renderer.render(scene,camera);
 }
 // Test-only controls let automated browser checks exercise the real mission state machine.
 if(import.meta.env.DEV) window.__aivmTest={
@@ -264,6 +264,7 @@ if(import.meta.env.DEV) window.__aivmTest={
   health(value){health=value},
   fail(){health=0;finish(false)},
   defeatGuards(){enemies.filter(e=>e.alive&&(e.kind==='guard'||e.kind==='drop-guard')).forEach(e=>damageEnemy(e,100))},
+  playerStatus(){const a=player.userData.animation;return {loaded:!!a,role:a?.role,action:a?.current?.getClip().name||null,gun:!!player.userData.model?.userData.gun,visible:player.visible}},
   animalStatus(){return animals.map(a=>({type:a.type,x:a.mesh.position.x,z:a.mesh.position.z,loaded:!!a.mesh.userData.animalAnimation}))},
   renderInfo(){return {calls:renderer.info.render.calls,triangles:renderer.info.render.triangles}},
   targets(){return enemies.filter(e=>e.alive).map(e=>{const p=e.mesh.position.clone().add(new THREE.Vector3(0,1.35,0)).project(camera);return {x:(p.x+1)*innerWidth/2,y:(1-p.y)*innerHeight/2,hp:e.hp,kind:e.kind}})}

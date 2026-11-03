@@ -1,6 +1,6 @@
 # AIVM — AI Velocity Mobile
 
-AIVM is an original, touch-first 3D city action **prototype**, built with Three.js and Vite. It is not a full GTA- or CODM-scale game. Explore a small city in third person, ride a bike or car, fight enemy bots with three weapons, and complete three short missions. The character uses distinct upright idle, walk, sprint and aiming poses, and the street-level camera sits closer to shoulder height. The district has textured surfaces, detailed storefronts, a Palm Grove gateway, low-rise homes, storefronts, a distant business district, ambient pedestrians, traffic, dogs, cats and pigeons. The opening delivery becomes a rival-car pursuit followed by a drop-zone shootout; you can use the bike, car or travel on foot.
+AIVM is an original, touch-first 3D city action **prototype**, built with Three.js and Vite. It is not a full GTA- or CODM-scale game. Explore a small city in third person, ride a bike or car, fight enemy bots with three weapons, and complete three short missions. The playable character is a rigged, textured MakeHuman model with distinct idle, walk, sprint and aiming poses, and the street-level camera sits closer to shoulder height. The district has textured surfaces, detailed storefronts, a Palm Grove gateway, low-rise homes, storefronts, a distant business district, ambient pedestrians, traffic, dogs, cats and pigeons. The opening delivery becomes a rival-car pursuit followed by a drop-zone shootout; you can use the bike, car or travel on foot.
 
 ## Run locally
 

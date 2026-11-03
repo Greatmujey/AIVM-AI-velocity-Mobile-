@@ -14,20 +14,31 @@ export function createModels(renderer) {
     }));
     return cache.get(name);
   }
-  ['human','human-anims','sedan-sports','motorcycle','cat','dog'].forEach(load);
+  ['human','human-anims','player-marcus','sedan-sports','motorcycle','cat','dog'].forEach(load);
   function createHuman(gltf, animations, role) {
     const model=cloneSkeleton(gltf.scene);
     // One precomputed mesh LOD per person, rather than rendering all four at once.
     const lod=role==='player'?'player_LOD1':'player_LOD2';
     const palette={enemy:{outfit:0xad4a3c,skin:0xbd866a,hair:0x302a29},civilian:{outfit:0xb5c5ca,skin:0xbd896b,hair:0x3d3029},'civilian-female':{outfit:0x7797a1,skin:0xa27157,hair:0x262626},'civilian-warm':{outfit:0xbc8567,skin:0xd1a181,hair:0x403027},'civilian-dark':{outfit:0x658471,skin:0x805742,hair:0x252322}};
-    const flashMaterials=[];model.traverse(o=>{if(/^player_LOD[0-3]$/.test(o.name))o.visible=o.name===lod;if(o.isMesh){o.castShadow=true;o.receiveShadow=true;const color=palette[role]?.[o.material?.name];if(color!==undefined){o.material=o.material.clone();o.material.color.setHex(color);if(role==='enemy'&&o.material.name==='outfit')flashMaterials.push(o.material)}}});
+    const flashMaterials=[];model.traverse(o=>{if(/^player_LOD[0-3]$/.test(o.name))o.visible=o.name===lod;if(o.isMesh){o.castShadow=true;o.receiveShadow=true;
+      // The new character has separate MakeHuman meshes; correct their alpha
+      // modes so skin/clothes don't render transparent while hair stays cut out.
+      if(role==='player'||role==='rider'){
+        const label=o.name,m=o.material;
+        if(/^(Hair|Eyebrows|Eyelashes)/.test(label))Object.assign(m,{transparent:false,alphaTest:.35,depthWrite:true,side:THREE.DoubleSide});
+        else if(/^Eyes/.test(label))Object.assign(m,{transparent:false,alphaTest:.5,depthWrite:true,roughness:.15});
+        else {Object.assign(m,{transparent:false,alphaTest:0,depthWrite:true});if(/^Body/.test(label))m.alphaMap=null;if(/^Clothes/.test(label))Object.assign(m,{roughness:.8,metalness:0,roughnessMap:null,metalnessMap:null})}
+        m.needsUpdate=true;o.frustumCulled=false;
+      }
+      const color=palette[role]?.[o.material?.name];if(color!==undefined){o.material=o.material.clone();o.material.color.setHex(color);if(role==='enemy'&&o.material.name==='outfit')flashMaterials.push(o.material)}}});
     const bounds=new THREE.Box3().setFromObject(model),size=bounds.getSize(new THREE.Vector3());
     const scale=2.5/size.y,visual=new THREE.Group();visual.rotation.y=Math.PI;
     model.scale.setScalar(scale);model.position.y=-bounds.min.y*scale;visual.add(model);
     visual.userData.flashMaterials=flashMaterials;
     const mixer=new THREE.AnimationMixer(model), actions={};
     for(const clip of animations.animations)actions[clip.name]=mixer.clipAction(clip);
-    const initial=actions[role==='player'||role.startsWith('civilian')?'unarmed_idle':'idle']||actions.idle;
+    if(role==='player')for(const clip of gltf.animations)if(clip.name==='Idle'||clip.name==='Walk')actions[clip.name]=mixer.clipAction(clip);
+    const initial=actions[role==='player'?'Idle':role.startsWith('civilian')?'unarmed_idle':'idle']||actions.idle;
     initial?.play();
     if(role==='player'||role==='enemy'){
       const hand=model.getObjectByName('mixamorigRightHand');
@@ -45,7 +56,7 @@ export function createModels(renderer) {
     return {visual,model,mixer,actions,current:initial,role};
   }
   async function person(group,role) {
-    const [gltf,animations]=await Promise.all([load('human'),load('human-anims')]);if(!gltf||!animations)return;
+    const [gltf,animations]=await Promise.all([load(role==='player'?'player-marcus':'human'),load('human-anims')]);if(!gltf||!animations)return;
     const human=createHuman(gltf,animations,role);for(const child of group.children)if(!child.userData.persist)child.visible=false;group.add(human.visual);
     group.userData.animation=human;group.userData.model=human.visual;if(group.userData.weaponIndex!==undefined)updateWeapon(group,group.userData.weaponIndex);
   }
@@ -65,7 +76,7 @@ export function createModels(renderer) {
     for(const child of vehicle.mesh.children)child.visible=false;
     vehicle.mesh.add(visual);vehicle.wheels=[];model.traverse(o=>{if(/wheel[-_]/i.test(o.name))vehicle.wheels.push(o)});
     if(vehicle.type==='bike') {
-      const [personGltf,animations]=await Promise.all([load('human'),load('human-anims')]);if(!personGltf||!animations)return;
+      const [personGltf,animations]=await Promise.all([load('player-marcus'),load('human-anims')]);if(!personGltf||!animations)return;
       const human=createHuman(personGltf,animations,'rider'),rider=human.visual;rider.scale.setScalar(.84);rider.position.set(0,.82,.15);rider.visible=false;
       const crouch=human.actions.crouch_idle;if(crouch){human.current?.stop();crouch.play();human.mixer.update(.3)}
       vehicle.mesh.add(rider);vehicle.rider=rider;rider.visible=!!vehicle.occupied;
@@ -76,6 +87,7 @@ export function createModels(renderer) {
 export function personAnimationName(role, amount, shooting=false, aiming=false, sprinting=false) {
   if (shooting) return 'fire';
   if (aiming) return amount > .1 ? 'walk' : 'aim_idle';
+  if (role === 'player') return amount > .1 ? (sprinting ? 'unarmed_run' : 'Walk') : 'Idle';
   if (role === 'enemy') return amount > .1 ? 'run' : 'idle';
   if (amount > .1) return sprinting ? 'unarmed_run' : 'unarmed_walk';
   return 'unarmed_idle';
