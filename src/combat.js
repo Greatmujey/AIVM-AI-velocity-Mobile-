@@ -24,9 +24,14 @@ export function selectReticleTarget(candidates, assistPixels = 0) {
   let best = null, bestScore = Infinity;
   for (const candidate of candidates) {
     if (!candidate.visible || !candidate.clear || candidate.distance > candidate.range) continue;
+    const halfWidth = Math.max(1, candidate.bodyRadius);
+    const halfHeight = Math.max(1, candidate.bodyHalfHeight ?? halfWidth);
     const distanceFromCenter = Math.hypot(candidate.x, candidate.y);
-    if (distanceFromCenter > candidate.bodyRadius + assistPixels) continue;
-    const score = distanceFromCenter / Math.max(1, candidate.bodyRadius) + candidate.distance * .001;
+    const normalized = Math.hypot(candidate.x / halfWidth, candidate.y / halfHeight);
+    // Approximate distance from the projected body ellipse, not just its center.
+    const outsideBody = normalized > 1 ? distanceFromCenter * (1 - 1 / normalized) : 0;
+    if (outsideBody > assistPixels) continue;
+    const score = normalized + candidate.distance * .001;
     if (score < bestScore) { best = candidate.enemy; bestScore = score; }
   }
   return best;

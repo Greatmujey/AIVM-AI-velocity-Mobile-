@@ -10,3 +10,5 @@ test('narrow aim cones exclude targets off the reticle',()=>{const offAxis=enemy
 import { selectReticleTarget } from '../src/combat.js';
 test('reticle selection picks the closest visible body and ignores blocked targets',()=>{const a={enemy:'a',x:8,y:0,bodyRadius:10,visible:true,clear:true,distance:10,range:30},b={...a,enemy:'b',x:1,clear:false};assert.equal(selectReticleTarget([a,b]),'a')});
 test('assist is bounded and cannot select off-screen or out-of-range targets',()=>{const e={enemy:'e',x:27,y:0,bodyRadius:7,visible:true,clear:true,distance:20,range:30};assert.equal(selectReticleTarget([e],0),null);assert.equal(selectReticleTarget([e],22),'e');assert.equal(selectReticleTarget([{...e,visible:false}],100),null);assert.equal(selectReticleTarget([{...e,distance:40}],100),null)});
+
+test('manual reticle can hit the upper and lower body without selecting nearby misses',()=>{const e={enemy:'e',x:0,y:16,bodyRadius:8,bodyHalfHeight:20,visible:true,clear:true,distance:15,range:30};assert.equal(selectReticleTarget([e],0),'e');assert.equal(selectReticleTarget([{...e,x:12,y:0}],0),null);assert.equal(selectReticleTarget([{...e,x:12,y:0}],5),'e')});
