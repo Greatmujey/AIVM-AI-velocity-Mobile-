@@ -22,12 +22,13 @@ export function createModels(renderer) {
     const palette={enemy:{outfit:0xad4a3c,skin:0xbd866a,hair:0x302a29},civilian:{outfit:0xb5c5ca,skin:0xbd896b,hair:0x3d3029},'civilian-female':{outfit:0x7797a1,skin:0xa27157,hair:0x262626},'civilian-warm':{outfit:0xbc8567,skin:0xd1a181,hair:0x403027},'civilian-dark':{outfit:0x658471,skin:0x805742,hair:0x252322}};
     const flashMaterials=[];model.traverse(o=>{if(/^player_LOD[0-3]$/.test(o.name))o.visible=o.name===lod;if(o.isMesh){o.castShadow=true;o.receiveShadow=true;const color=palette[role]?.[o.material?.name];if(color!==undefined){o.material=o.material.clone();o.material.color.setHex(color);if(role==='enemy'&&o.material.name==='outfit')flashMaterials.push(o.material)}}});
     const bounds=new THREE.Box3().setFromObject(model),size=bounds.getSize(new THREE.Vector3());
-    const scale=3.15/size.y,visual=new THREE.Group();visual.rotation.y=Math.PI;
+    const scale=2.5/size.y,visual=new THREE.Group();visual.rotation.y=Math.PI;
     model.scale.setScalar(scale);model.position.y=-bounds.min.y*scale;visual.add(model);
     visual.userData.flashMaterials=flashMaterials;
     const mixer=new THREE.AnimationMixer(model), actions={};
     for(const clip of animations.animations)actions[clip.name]=mixer.clipAction(clip);
-    if(actions.idle)actions.idle.play();
+    const initial=actions[role==='player'||role.startsWith('civilian')?'unarmed_idle':'idle']||actions.idle;
+    initial?.play();
     if(role==='player'||role==='enemy'){
       const hand=model.getObjectByName('mixamorigRightHand');
       if(hand){
@@ -41,7 +42,7 @@ export function createModels(renderer) {
       const arm=model.getObjectByName('mixamorigLeftArm');
       if(arm){const band=new THREE.Mesh(new THREE.CylinderGeometry(.065,.065,.12,8,1,true),new THREE.MeshStandardMaterial({color:0xd45139}));band.position.y=.13;arm.add(band)}
     }
-    return {visual,model,mixer,actions,current:actions.idle};
+    return {visual,model,mixer,actions,current:initial,role};
   }
   async function person(group,role) {
     const [gltf,animations]=await Promise.all([load('human'),load('human-anims')]);if(!gltf||!animations)return;
@@ -65,16 +66,25 @@ export function createModels(renderer) {
     vehicle.mesh.add(visual);vehicle.wheels=[];model.traverse(o=>{if(/wheel[-_]/i.test(o.name))vehicle.wheels.push(o)});
     if(vehicle.type==='bike') {
       const [personGltf,animations]=await Promise.all([load('human'),load('human-anims')]);if(!personGltf||!animations)return;
-      const human=createHuman(personGltf,animations,'rider'),rider=human.visual;rider.scale.setScalar(.7);rider.position.set(0,.82,.15);rider.visible=false;
+      const human=createHuman(personGltf,animations,'rider'),rider=human.visual;rider.scale.setScalar(.84);rider.position.set(0,.82,.15);rider.visible=false;
       const crouch=human.actions.crouch_idle;if(crouch){human.current?.stop();crouch.play();human.mixer.update(.3)}
       vehicle.mesh.add(rider);vehicle.rider=rider;rider.visible=!!vehicle.occupied;
     }
   }
   return { person, vehicle, animal };
 }
-export function animatePerson(group,amount,dt,shooting=false) {
+export function personAnimationName(role, amount, shooting=false, aiming=false, sprinting=false) {
+  if (shooting) return 'fire';
+  if (aiming) return amount > .1 ? 'walk' : 'aim_idle';
+  if (role === 'enemy') return amount > .1 ? 'run' : 'idle';
+  if (amount > .1) return sprinting ? 'unarmed_run' : 'unarmed_walk';
+  return 'unarmed_idle';
+}
+
+export function animatePerson(group,amount,dt,shooting=false,aiming=false,sprinting=false) {
   const a=group.userData.animation;if(!a)return false;
-  const action=shooting?a.actions.fire:amount>.75?a.actions.run:amount>.1?a.actions.walk:a.actions.idle;
+  const name=personAnimationName(a.role,amount,shooting,aiming,sprinting);
+  const action=a.actions[name]||a.actions.idle;
   if(action&&action!==a.current){a.current?.fadeOut(.15);action.reset().fadeIn(.15).play();a.current=action}
   a.mixer.update(dt);return true;
 }

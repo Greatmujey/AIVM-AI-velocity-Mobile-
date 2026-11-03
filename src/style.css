@@ -39,3 +39,18 @@
 @media(max-width:500px) and (orientation:portrait){.map-panel{padding:10px}.map-body{flex-direction:column;gap:9px}.full-map-wrap canvas{width:min(86vw,53vh,500px)}.map-legend{flex-direction:row;flex-wrap:wrap;gap:5px 10px;max-width:min(86vw,53vh,500px);font-size:9px}.map-legend strong{width:100%}.map-legend b{width:13px;font-size:11px}.map-legend small{width:100%;margin:0}.map-heading h2{font-size:19px}}
 @media(max-height:350px) and (orientation:landscape){.map-panel{padding:8px}.map-heading{margin-bottom:5px}.map-heading h2{font-size:17px}.full-map-wrap canvas{width:min(59vh,55vw)}.map-legend{gap:5px}.map-close{min-height:33px}}
 .secondary{width:100%;margin-top:8px;background:#1c2c26;border:1px solid #b5c7ad66;color:#d9e9d4;font:800 13px 'Barlow Condensed',sans-serif;letter-spacing:.13em;padding:10px}.secondary:hover{border-color:#c9fc51}.secondary:focus-visible,.primary:focus-visible{outline:3px solid #c9fc51;outline-offset:3px}.primary[hidden]{display:none}
+/* Lighter, legible touch HUD leaves more of the world visible. */
+.vignette{background:linear-gradient(180deg,rgba(4,8,12,.25),transparent 23%,transparent 73%,rgba(4,8,12,.46))}
+.action{background:rgba(13,31,31,.72);border-color:rgba(197,242,226,.67);box-shadow:0 2px 12px #0006,inset 0 0 12px #3ecba51a}
+.action.fire,.hud.driving #accelerate-btn{background:rgba(31,135,113,.9);color:#fff;border:2px solid #b9f8e2;box-shadow:0 0 0 3px #2c887966,0 3px 16px #0008}
+.action.fire:active,.hud.driving #accelerate-btn:active{background:#56bda5}
+.action.selected{background:#5cb99e;color:#061d17;border-color:#d7fff4}
+.joystick{background:#102e2a80;border:1px solid #b7eee5a6;box-shadow:inset 0 0 20px #6bc7ae22,0 3px 12px #0005}
+.stick{background:#a4e1d3a8;border-color:#e3fff7;box-shadow:0 0 14px #5acdbd55}
+.map-wrap{border:2px solid #91e4d4;box-shadow:0 0 0 2px #296f65,0 4px 15px #0009}
+.mission{border-left-color:#94e9d0;background:linear-gradient(90deg,rgba(8,20,20,.84),rgba(8,20,20,.48))}
+.settings-button{display:block;pointer-events:auto;margin:6px 0 0 auto;background:#102924d9;border:1px solid #9ad7c89c;border-radius:3px;padding:6px 8px;color:#e6fff7;font-size:9px;font-weight:800;letter-spacing:.08em;touch-action:manipulation}
+.settings-button:focus-visible{outline:2px solid white;outline-offset:2px}
+.settings-panel[hidden]{display:none}.settings-panel{position:absolute;right:0;z-index:8;pointer-events:auto;padding:4px 8px 8px;min-width:142px;background:#10211eef;border:1px solid #a5d8c988;box-shadow:0 5px 16px #0009}
+.settings-panel .settings-row{justify-content:flex-end}.settings-panel .sensitivity{font-size:10px;gap:8px}.settings-panel .sensitivity input{width:82px}
+@media(max-width:800px),(pointer:coarse){.map-note{display:none}.settings-button{font-size:8px;padding:6px;margin-top:5px}}

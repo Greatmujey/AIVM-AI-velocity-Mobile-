@@ -35,8 +35,18 @@ export function createWorld(scene) {
   }crossing.count=crossCount;scene.add(crossing);
   // The map keeps its navigable street grid, but each block has a distinct
   // neighbourhood identity: low homes, commercial corners and a distant CBD.
-  const stucco=[mat(0xd7bda0),mat(0xc9b8a0),mat(0xb7c2b1),mat(0xddc3a5),mat(0xb4a99c)];
-  const roofs=[mat(0x66504a),mat(0x725a4c),mat(0x5d6259),mat(0x795e4d)];
+  // Subtle reusable, locally generated surface detail instead of flat block colours.
+  function detailTexture(kind) {
+    const c=document.createElement('canvas');c.width=c.height=256;const ctx=c.getContext('2d');
+    ctx.fillStyle=kind==='wall'?'#dedbd2':'#aaa49b';ctx.fillRect(0,0,256,256);
+    let seed=kind==='wall'?973:683;const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296};
+    for(let i=0;i<3400;i++){const x=rand()*256,y=rand()*256,v=rand()>.5?255:30;ctx.fillStyle=`rgba(${v},${v},${v},${rand()*.095})`;ctx.fillRect(x,y,1+rand()*3,1+rand()*3)}
+    if(kind==='roof'){ctx.strokeStyle='#4e474044';ctx.lineWidth=1;for(let y=0;y<256;y+=22){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(256,y);ctx.stroke();for(let x=(y/22%2)*16;x<256;x+=32){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y+22);ctx.stroke()}}}
+    const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;return t;
+  }
+  const wallDetail=detailTexture('wall'),roofDetail=detailTexture('roof');
+  const stucco=[mat(0xd7bda0,{map:wallDetail}),mat(0xc9b8a0,{map:wallDetail}),mat(0xb7c2b1,{map:wallDetail}),mat(0xddc3a5,{map:wallDetail}),mat(0xb4a99c,{map:wallDetail})];
+  const roofs=[mat(0x66504a,{map:roofDetail}),mat(0x725a4c,{map:roofDetail}),mat(0x5d6259,{map:roofDetail}),mat(0x795e4d,{map:roofDetail})];
   const concrete=mat(0xb4a89a), wood=mat(0x7b6854), greenery=mat(0x687b53), windowMat=mat(0x637f84,{metalness:.15,roughness:.3});
   const shops=['MESA MARKET','SUNDOWN AUTO','PALM LIQUOR','SUNSET MOTEL','SILVER DINER','CORNER MART'];
   const billboardImage=texLoader.load(`${import.meta.env.BASE_URL}assets/coast-billboard.jpg`);billboardImage.colorSpace=THREE.SRGBColorSpace;const billboardArt=new THREE.MeshStandardMaterial({map:billboardImage,roughness:.85});
@@ -68,11 +78,15 @@ export function createWorld(scene) {
     box(3,.12,1.3,greenery,x-w*.31,.32,z+d/2+.7,scene,false);
     box(3,.12,1.3,greenery,x+w*.31,.32,z+d/2+.7,scene,false);
   }
+  const awningStripes=[mat(0xd5aa87),mat(0xe7d5a9)];
   function store(x,z,seed){
     const w=11.8,d=10.8,h=4.4+(seed%2)*.6;structure(w,h,d,x,z,stucco[(seed+2)%stucco.length]);box(w+.45,.35,d+.45,roofs[seed%roofs.length],x,h+.4,z);
     box(w*.88,.26,1.55,roofs[(seed+1)%roofs.length],x,2.85,z+d/2+.65,scene,false);
     box(w*.82,1.05,.12,signs[seed%signs.length],x,3.65,z+d/2+.09,scene,false);
     box(w*.76,2,.08,windowMat,x,1.35,z+d/2+.08,scene,false);box(1.25,2.3,.12,wood,x,1.4,z+d/2+.17,scene,false);
+    // Individual panes and alternating awning strips break up the plain frontage.
+    for(const side of [-1,1]){box(.08,1.9,.1,concrete,x+side*w*.2,1.35,z+d/2+.16,scene,false);box(w*.29,.07,.1,concrete,x+side*w*.21,1.5,z+d/2+.16,scene,false)}
+    const stripe=awningStripes[seed%2];for(let j=0;j<6;j++)box(w*.073,.28,1.55,stripe,x-w*.37+j*w*.148,2.86,z+d/2+.66,scene,false);
     for(const side of [-1,1]){
       box(.1,2.2,.1,concrete,x+side*w*.36,1.35,z+d/2+.2,scene,false);
       box(.1,1.75,3.6,windowMat,x+side*(w/2+.08),1.55,z,scene,false);
@@ -130,6 +144,24 @@ export function createWorld(scene) {
     box(.5,.9,.5,post,x+6.8,.45,z+9.4,scene,false);box(.85,.16,.2,post,x+6.8,.8,z+9.4,scene,false);
     box(1.5,.45,1.1,concrete,x-7.6,.25,z+10,scene,false);box(1.35,.55,.95,shrub,x-7.6,.72,z+10,scene,false);
     box(.14,3,.14,metalDetail,x+7,1.5,z-8,scene,false);box(1.7,.6,.1,signs[(Math.abs(x)+Math.abs(z))%shops.length],x+7,2.8,z-8,scene,false);
+  }
+  // Opening-block street dressing: decorative only, kept away from travel lanes.
+  const paint=mat(0xe7d0a5), benchWood=mat(0x805a3c), planter=mat(0xc88866), leaves=mat(0x567651);
+  for(const [x,z] of [[-7.8,17],[7.8,-17],[-7.8,-34],[7.8,34]]){
+    // Bench alongside the pavement, with separate slats and metal legs.
+    for(let i=-1;i<=1;i++)box(.18,.12,2.1,benchWood,x+i*.24,.72,z,scene,false);
+    for(const dz of [-.75,.75]){box(.6,.1,.12,trim,x,.68,z+dz,scene,false);box(.1,.65,.1,trim,x-.24,.34,z+dz,scene,false);box(.1,.65,.1,trim,x+.24,.34,z+dz,scene,false)}
+    box(.1,.72,2.1,benchWood,x-.36,1.16,z,scene,false);
+  }
+  for(const [x,z] of [[-7.6,23],[7.6,-22],[-7.6,-45],[7.6,41]]){
+    box(1.1,.65,1.1,planter,x,.38,z,scene,false);box(.9,.65,.9,leaves,x,.98,z,scene,false);box(.5,.4,.5,greenery,x,1.42,z,scene,false);
+  }
+  // Curbs, drains and painted parking bays give the road an inhabited scale.
+  for(const z of [-42,-14,14,42])for(const side of [-1,1]){
+    box(.14,.12,12,concrete,side*6.55,.12,z,scene,false);
+    box(.42,.025,1.05,trim,side*6.18,.08,z+4,scene,false);
+    for(let i=-2;i<=2;i++)box(.45,.035,.035,metalDetail,side*6.18,.1,z+4+i*.17,scene,false);
+    box(.12,.025,3,paint,side*5.35,.095,z,scene,false);
   }
   // Utility poles and overhead cables add depth along the residential streets.
   const cable=mat(0x403c36);for(let z=-56;z<=56;z+=28){box(.16,7,.16,wood,-6.8,3.5,z,scene,false);box(1.4,.14,.14,wood,-6.8,6.7,z,scene,false);if(z<56)box(.05,.05,28,cable,-6.8,6.7,z+14,scene,false)}
