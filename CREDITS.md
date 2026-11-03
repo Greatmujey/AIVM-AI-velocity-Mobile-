@@ -1,0 +1,11 @@
+# Third-party asset credits
+
+All assets below are included locally; they are not taken from GTA or Call of Duty. Credits are given even where not required.
+
+- **Human model** (`public/assets/models/human.glb`): MPFB2 / MakeHuman body authored by the UIC Campus Game project; its [credits](https://github.com/sthak34-sudo/UIC-campus-game/blob/149944d01f54bfbd681220fd799a176363995a93/CREDITS.md) designate the model CC0 1.0. Source: `client/public/models/characters/player_base.glb` at that commit.
+- **Human animation** (`human-anims.glb`): Quaternius Universal Animation Library (Standard), CC0 1.0, retargeted to the above body by the UIC Campus Game project. Source: `client/public/models/characters/player_anims_cc0.glb` at the commit above; the project credits identify these clips as CC0 and separate them from private Mixamo clips. The original Quaternius license is in `public/assets/licenses/quaternius.txt`.
+- **Sports sedan** (`sedan-sports.glb`): Kenney Car Kit, CC0 1.0. Mirror: [Hidencod/tge-assets](https://github.com/Hidencod/tge-assets/tree/7be9b573bc74f32ed766b44b3f46550d02ca83b5/packs/car-kit); license: `public/assets/licenses/kenney-car.txt`.
+- **Motorcycle and color map** (`motorcycle.glb`, `Textures/colormap.png`): Kenney Racing Kit, CC0 1.0. Mirror: [Kenny-Racing](https://github.com/christopheschneider86-rgb/Kenny-Racing); license: `public/assets/licenses/kenney-racing.txt`.
+- **Asphalt and concrete texture details**: Poly Haven CC0 assets, adapted in [shooter-game-2](https://github.com/hartj77-blip/shooter-game-2/blob/main/CREDITS.md). Asphalt 02 by Rob Tuytel, and Concrete Floor 02 by Rob Tuytel.
+- **Firearm audio** (`pistol.mp3`, `rifle.mp3`, `shotgun.mp3`): CC0 from [The Free Firearm Sound Library](https://opengameart.org/content/the-free-firearm-sound-library) by Ben Jaszczak et al., adapted in shooter-game-2. **Reload audio** (`reload.mp3`): CC0 from [Handgun Reload Sound Effect](https://opengameart.org/content/handgun-reload-sound-effect) by zer0_sol, adapted in shooter-game-2.
+- **Basis Universal transcoder** in `public/basis`: included with Three.js, MIT license. License: `public/assets/licenses/three.txt` ([upstream](https://github.com/mrdoob/three.js/blob/master/LICENSE)).

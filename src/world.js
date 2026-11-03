@@ -1,9 +1,13 @@
 import * as THREE from 'three';
 
-// All city art is generated locally so the prototype does not need external assets.
+// The city is generated locally; licensed character and vehicle models load separately.
 export function createWorld(scene) {
   const mat = (color, options = {}) => new THREE.MeshStandardMaterial({color, roughness: .8, ...options});
-  const dark = mat(0x1b242a), road = mat(0x3a4145), pavement = mat(0x68716f), trim = mat(0x2c353b);
+  const dark = mat(0x1b242a), pavement = mat(0x89918c), trim = mat(0x2c353b);
+  const texLoader=new THREE.TextureLoader();
+  function surface(path,repeatX,repeatY){const t=texLoader.load(`${import.meta.env.BASE_URL}assets/textures/${path}`);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(repeatX,repeatY);t.anisotropy=2;return t}
+  const roadVertical=mat(0x626966,{map:surface('asphalt_color.jpg',3,50)}),roadHorizontal=mat(0x626966,{map:surface('asphalt_color.jpg',50,3)});
+  pavement.map=surface('concrete_color.jpg',3,3);
   const glass = mat(0x668a9b, {metalness:.35, roughness:.25});
   const glow = new THREE.MeshBasicMaterial({color:0xd7f977});
   const red = new THREE.MeshBasicMaterial({color:0xef6e55});
@@ -17,7 +21,7 @@ export function createWorld(scene) {
   const marks = new THREE.InstancedMesh(markGeometry,mat(0xe7d7a6),7*30*2);
   const helper = new THREE.Object3D(); let markCount=0;
   for(let n=-84;n<=84;n+=28){
-    box(13,.06,210,road,n,.01,0,scene,false);box(210,.06,13,road,0,.02,n,scene,false);
+    box(13,.06,210,roadVertical,n,.01,0,scene,false);box(210,.06,13,roadHorizontal,0,.02,n,scene,false);
     for(let p=-98;p<=98;p+=7){helper.position.set(n,.07,p);helper.rotation.y=0;helper.updateMatrix();marks.setMatrixAt(markCount++,helper.matrix);helper.position.set(p,.08,n);helper.rotation.y=Math.PI/2;helper.updateMatrix();marks.setMatrixAt(markCount++,helper.matrix)}
   }
   marks.count=markCount;marks.receiveShadow=true;scene.add(marks);
@@ -37,6 +41,8 @@ export function createWorld(scene) {
     const texture=new THREE.CanvasTexture(c);texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=2;return new THREE.MeshStandardMaterial({map:texture,roughness:.95});
   }
   const facades=Array.from({length:5},(_,i)=>facade(i));
+  const shopLabels=['NOVA MARKET','THE GARAGE','CITY NOODLES','MOTEL 88','AFTER HOURS','CORNER STORE'];
+  const signs=shopLabels.map((text,i)=>{const c=document.createElement('canvas');c.width=512;c.height=128;const ctx=c.getContext('2d');ctx.fillStyle=['#9b543b','#266f6d','#b48238','#5a5579','#b85453','#315e6a'][i];ctx.fillRect(0,0,512,128);ctx.fillStyle='#f1e5c6';ctx.textAlign='center';ctx.font='bold 47px sans-serif';ctx.fillText(text,256,80);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return new THREE.MeshStandardMaterial({map:t,roughness:.85})});
   for(let x=-70;x<=70;x+=28)for(let z=-70;z<=70;z+=28){
     box(15,.25,15,pavement,x,.1,z,scene,false);
     const seed=Math.abs((x*3+z*7)/14)|0, h=8+Math.abs(x*7+z*13)%19,w=10+(seed%3),d=10+((seed+1)%3);
@@ -45,12 +51,19 @@ export function createWorld(scene) {
     // Shop awnings and illuminated signs break up the street-level skyline.
     const awning=mat([0xcd6a50,0x5c938c,0xd0a16b][seed%3]);
     box(w*.65,.18,1.2,awning,x,3,z+d/2+.55,scene,false);
-    box(w*.55,.75,.12,trim,x,3.65,z+d/2+.08,scene,false);
-    box(w*.43,.1,.14,seed%2?glow:red,x,3.65,z+d/2+.17,scene,false);
+    box(w*.6,1,.12,signs[seed%signs.length],x,3.75,z+d/2+.12,scene,false);
+    box(w*.56,2.1,.1,glass,x,1.45,z+d/2+.07,scene,false);
+    box(.9,2.1,.14,trim,x,1.4,z+d/2+.14,scene,false);
+    box(.06,2.1,.06,glow,x+.35,1.4,z+d/2+.22,scene,false);
   }
   // Lamps and small street furniture, clear of the main driving lanes.
   for(let x=-84;x<=84;x+=28)for(let z=-84;z<=84;z+=28){
     if((x+z)%56===0){box(.16,5.5,.16,trim,x+6.6,2.75,z+6.6,scene,false);box(1.4,.12,.16,trim,x+6,5.4,z+6.6,scene,false);box(.55,.12,.4,glow,x+5.4,5.3,z+6.6,scene,false)}
+  }
+  // Street furniture is placed close to the curb, outside the driving lanes.
+  for(let x=-56;x<=56;x+=56)for(let z=-56;z<=56;z+=56){
+    box(.18,4.5,.18,trim,x-7,2.25,z-7,scene,false);box(.7,1.5,.45,trim,x-7,4,z-7,scene,false);
+    box(.4,.3,.08,red,x-7,4.45,z-6.76,scene,false);box(.4,.3,.08,glow,x-7,3.65,z-6.76,scene,false);
   }
   // Palm trees give the district a warmer, lived-in street-level silhouette.
   const bark=mat(0x665647), leaf=mat(0x405e4c), treeGeometry=new THREE.ConeGeometry(1.8,4.8,5);
