@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { LANDMARKS, ROAD_LIMIT } from './city-data.js';
 
 // The city is generated locally; licensed character and vehicle models load separately.
 export function createWorld(scene) {
@@ -18,16 +19,16 @@ export function createWorld(scene) {
   }
   box(390,.4,390,mat(0x6e7970),0,-.3,0,scene,false);
   const markGeometry = new THREE.BoxGeometry(.13,.025,2.2);
-  const marks = new THREE.InstancedMesh(markGeometry,mat(0xe7d7a6),7*30*2);
+  const marks = new THREE.InstancedMesh(markGeometry,mat(0xe7d7a6),11*46*2);
   const helper = new THREE.Object3D(); let markCount=0;
-  for(let n=-84;n<=84;n+=28){
-    box(13,.06,210,roadVertical,n,.01,0,scene,false);box(210,.06,13,roadHorizontal,0,.02,n,scene,false);
-    for(let p=-98;p<=98;p+=7){helper.position.set(n,.07,p);helper.rotation.y=0;helper.updateMatrix();marks.setMatrixAt(markCount++,helper.matrix);helper.position.set(p,.08,n);helper.rotation.y=Math.PI/2;helper.updateMatrix();marks.setMatrixAt(markCount++,helper.matrix)}
+  for(let n=-ROAD_LIMIT;n<=ROAD_LIMIT;n+=28){
+    box(13,.06,322,roadVertical,n,.01,0,scene,false);box(322,.06,13,roadHorizontal,0,.02,n,scene,false);
+    for(let p=-154;p<=154;p+=7){helper.position.set(n,.07,p);helper.rotation.y=0;helper.updateMatrix();marks.setMatrixAt(markCount++,helper.matrix);helper.position.set(p,.08,n);helper.rotation.y=Math.PI/2;helper.updateMatrix();marks.setMatrixAt(markCount++,helper.matrix)}
   }
   marks.count=markCount;marks.receiveShadow=true;scene.add(marks);
   // Zebra crossings at every junction, drawn in one instanced mesh for mobile.
-  const crossing = new THREE.InstancedMesh(new THREE.BoxGeometry(1,.025,.48),mat(0xd4d3bc),7*7*4*6);let crossCount=0;
-  for(let x=-84;x<=84;x+=28)for(let z=-84;z<=84;z+=28)for(let j=0;j<6;j++){
+  const crossing = new THREE.InstancedMesh(new THREE.BoxGeometry(1,.025,.48),mat(0xd4d3bc),11*11*4*6);let crossCount=0;
+  for(let x=-ROAD_LIMIT;x<=ROAD_LIMIT;x+=28)for(let z=-ROAD_LIMIT;z<=ROAD_LIMIT;z+=28)for(let j=0;j<6;j++){
     for(const side of [-1,1]){
       helper.rotation.y=0;helper.position.set(x-4.2+j*1.65,.11,z+side*8.2);helper.updateMatrix();crossing.setMatrixAt(crossCount++,helper.matrix);
       helper.rotation.y=Math.PI/2;helper.position.set(x+side*8.2,.11,z-4.2+j*1.65);helper.updateMatrix();crossing.setMatrixAt(crossCount++,helper.matrix);
@@ -104,10 +105,24 @@ export function createWorld(scene) {
     box(w*.8,.18,1.3,roofs[seed%roofs.length],x,3.2,z+d/2+.55,scene,false);box(1.6,2.3,.1,wood,x,1.4,z+d/2+.08,scene,false);
     box(2,.8,1.5,trim,x+2,h+.9,z,scene,false);
   }
-  for(let x=-70;x<=70;x+=28)for(let z=-70;z<=70;z+=28){
-    const xi=(x+70)/28,zi=(z+70)/28,seed=(xi*37+zi*53+xi*zi*19)%113;
+  function specialBuilding(place){
+    const {x,z,kind,name}=place, h=kind==='hotel'?12:kind==='casino'?7:kind==='church'||kind==='mosque'?6:4.6;
+    const facade=mat(({home:0xe2b99a,hub:0x4d8e87,friend:0xd49d8a,church:0xe5dbca,mosque:0xd2d7c2,hotel:0xe5aa83,casino:0x985576})[kind],{map:wallDetail});
+    structure(11,h,10,x,z,facade);box(11.5,.4,10.5,trim,x,h+.45,z,scene,false);
+    box(1.8,2.6,.16,wood,x,1.55,z+5.1,scene,false);
+    for(const side of [-1,1]){box(2.5,1.8,.12,windowMat,x+side*3.4,2.15,z+5.1,scene,false);box(2.9,.12,.3,concrete,x+side*3.4,1.15,z+5.2,scene,false)}
+    const c=document.createElement('canvas');c.width=512;c.height=128;const ctx=c.getContext('2d');ctx.fillStyle=place.color;ctx.fillRect(0,0,512,128);ctx.fillStyle='#182b2b';ctx.textAlign='center';ctx.font='bold 46px sans-serif';ctx.fillText(name,256,80);const texture=new THREE.CanvasTexture(c);texture.colorSpace=THREE.SRGBColorSpace;
+    box(9.5,.95,.13,new THREE.MeshStandardMaterial({map:texture}),x,3.65,z+5.16,scene,false);
+    if(kind==='church'){box(2.2,4,2.2,facade,x,h+2,z,scene,false);box(.24,2,.24,concrete,x,h+5,z,scene,false);box(1.4,.24,.24,concrete,x,h+5.1,z,scene,false)}
+    if(kind==='mosque'){const dome=new THREE.Mesh(new THREE.SphereGeometry(2.7,16,8,0,Math.PI*2,0,Math.PI/2),mat(0x75a997));dome.position.set(x,h+.65,z);scene.add(dome);box(1,8,1,facade,x+4.5,h+4,z,scene,false)}
+    if(kind==='casino'||kind==='hotel')for(let y=5;y<h;y+=2)for(const side of [-1,1])box(2.4,1.15,.12,windowMat,x+side*3,y,z+5.1,scene,false);
+  }
+  for(let x=-126;x<=126;x+=28)for(let z=-126;z<=126;z+=28){
+    const xi=(x+126)/28,zi=(z+126)/28,seed=(xi*37+zi*53+xi*zi*19)%113;
     box(15,.25,15,pavement,x,.1,z,scene,false);
-    if(z>=14&&Math.abs(x)<=70)house(x,z,seed);
+    const landmark=LANDMARKS.find(p=>p.x===x&&p.z===z);
+    if(landmark)specialBuilding(landmark);
+    else if(z>=14)house(x,z,seed);
     else if(z>=-14||seed%3===0)store(x,z,seed);
     else apartment(x,z,seed);
   }
@@ -121,7 +136,7 @@ export function createWorld(scene) {
   box(16.5,.3,.35,wood,0,6.65,0,scene,false);box(8,1.65,.18,gateSign,0,6.5,.2,scene,false);
   for(let x=-7;x<=7;x+=2)box(.18,.18,.18,glow,x,6.25,.25,scene,false);
   // Lamps and small street furniture, clear of the main driving lanes.
-  for(let x=-84;x<=84;x+=28)for(let z=-84;z<=84;z+=28){
+  for(let x=-ROAD_LIMIT;x<=ROAD_LIMIT;x+=28)for(let z=-ROAD_LIMIT;z<=ROAD_LIMIT;z+=28){
     if((x+z)%56===0){box(.16,5.5,.16,trim,x+6.6,2.75,z+6.6,scene,false);box(1.4,.12,.16,trim,x+6,5.4,z+6.6,scene,false);box(.55,.12,.4,glow,x+5.4,5.3,z+6.6,scene,false)}
   }
   // Street furniture is placed close to the curb, outside the driving lanes.
@@ -166,7 +181,7 @@ export function createWorld(scene) {
   // Utility poles and overhead cables add depth along the residential streets.
   const cable=mat(0x403c36);for(let z=-56;z<=56;z+=28){box(.16,7,.16,wood,-6.8,3.5,z,scene,false);box(1.4,.14,.14,wood,-6.8,6.7,z,scene,false);if(z<56)box(.05,.05,28,cable,-6.8,6.7,z+14,scene,false)}
   // Distant silhouettes frame the horizon without affecting navigation.
-  const skyline=mat(0x667b81);for(let i=0;i<32;i++){const a=i/32*Math.PI*2,dist=145,h=18+(i*19%38);box(13,h,13,skyline,Math.sin(a)*dist,h/2,Math.cos(a)*dist,scene,false)}
+  const skyline=mat(0x667b81);for(let i=0;i<32;i++){const a=i/32*Math.PI*2,dist=235,h=18+(i*19%38);box(13,h,13,skyline,Math.sin(a)*dist,h/2,Math.cos(a)*dist,scene,false)}
   // Batch decorative static boxes by material and 56m cell, retaining frustum
   // culling and leaving collision/raycast building meshes untouched.
   collectingStatic=false;

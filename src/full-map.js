@@ -1,6 +1,7 @@
+import { CITY_BOUND, ROAD_LIMIT, LANDMARKS, entrance } from './city-data.js';
 // The playable city is bounded by -100..100 in both world axes. Keep the full
 // map north-up, with a small margin around those bounds for symbols and labels.
-export const MAP_BOUND = 105;
+export const MAP_BOUND = CITY_BOUND + 5;
 export function worldToMap(x, z, size, bound = MAP_BOUND) {
   return { x: (x + bound) * size / (bound * 2), y: (z + bound) * size / (bound * 2) };
 }
@@ -12,18 +13,23 @@ export function drawFullMap(canvas, { blocks, position, target, route, enemies, 
   ctx.fillStyle = '#314640'; ctx.fillRect(0, 0, size, size);
   // District backgrounds follow the actual north/south division in world.js.
   const band = (top, bottom, color) => { ctx.fillStyle = color; ctx.fillRect(0, point({x:0,z:top}).y, size, (bottom-top)*scale); };
-  band(-105, -14, '#354949'); band(-14, 14, '#4b5345'); band(14, 105, '#495b49');
+  band(-MAP_BOUND, -14, '#39635f'); band(-14, 14, '#8b795c'); band(14, MAP_BOUND, '#688b6b');
   ctx.fillStyle = '#7d8982';
-  for (let road = -84; road <= 84; road += 28) {
+  for (let road = -ROAD_LIMIT; road <= ROAD_LIMIT; road += 28) {
     const p = point({x:road,z:road});
     ctx.fillRect(p.x - 6.5*scale, 0, 13*scale, size);
     ctx.fillRect(0, p.y - 6.5*scale, size, 13*scale);
   }
   // Building footprints are taken from the collision map, not invented blocks.
-  ctx.fillStyle = '#1c302e';
+  ctx.fillStyle = '#334d4a';
   for (const block of blocks) {
     const p = point(block);
     ctx.fillRect(p.x-block.halfX*scale, p.y-block.halfZ*scale, block.halfX*2*scale, block.halfZ*2*scale);
+  }
+  // Key destinations are anchored to the real entrance points.
+  for (const place of LANDMARKS) {
+    const p = point(entrance(place)); ctx.beginPath(); ctx.arc(p.x,p.y,12,0,Math.PI*2);
+    ctx.fillStyle=place.color;ctx.fill();ctx.strokeStyle='#182925';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#122b25';ctx.font='bold 15px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(({home:'H',hub:'M',friend:'F',church:'C',mosque:'Q',hotel:'T',casino:'$'})[place.id],p.x,p.y+1);
   }
   if (route.length > 1) {
     ctx.lineWidth = 8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';

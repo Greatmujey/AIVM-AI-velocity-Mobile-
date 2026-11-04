@@ -1,10 +1,11 @@
+import { CITY_BOUND } from './city-data.js';
 // Collision and input math are independent from rendering, so they can be tested.
 export function blocked(x, z, blocks, padding = 0) {
   return blocks.some(b => Math.abs(x - b.x) < b.halfX + padding && Math.abs(z - b.z) < b.halfZ + padding);
 }
 export function movePosition(position, dx, dz, blocks, padding = 0) {
-  const x = Math.max(-100, Math.min(100, position.x + dx));
-  const z = Math.max(-100, Math.min(100, position.z + dz));
+  const x = Math.max(-CITY_BOUND, Math.min(CITY_BOUND, position.x + dx));
+  const z = Math.max(-CITY_BOUND, Math.min(CITY_BOUND, position.z + dz));
   const beforeX = position.x, beforeZ = position.z;
   if (!blocked(x, position.z, blocks, padding)) position.x = x;
   if (!blocked(position.x, z, blocks, padding)) position.z = z;

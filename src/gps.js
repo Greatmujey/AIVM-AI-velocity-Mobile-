@@ -1,6 +1,7 @@
 // A tiny road-network router. This city uses streets on a 28m grid; routes are
 // calculated on intersections rather than pointing through occupied blocks.
-const ROADS = [-84,-56,-28,0,28,56,84];
+import { ROAD_LIMIT } from './city-data.js';
+const ROADS = Array.from({length: ROAD_LIMIT / 14 + 1}, (_, i) => -ROAD_LIMIT + i * 28);
 const nearest = value => ROADS.reduce((best, road) => Math.abs(value-road)<Math.abs(value-best)?road:best, ROADS[0]);
 const clamp = value => Math.max(ROADS[0],Math.min(ROADS.at(-1),value));
 
@@ -21,7 +22,7 @@ export function roadRoute(start,end){
   const a=project(start),b=project(end),nodes=new Map();
   for(const x of ROADS)for(const z of ROADS)nodes.set(key(x,z),{x,z,edges:[]});
   function link(u,v,cost){u.edges.push([v,cost]);v.edges.push([u,cost])}
-  for(const x of ROADS)for(const z of ROADS){const n=nodes.get(key(x,z));if(x<84)link(n,nodes.get(key(x+28,z)),28);if(z<84)link(n,nodes.get(key(x,z+28)),28)}
+  for(const x of ROADS)for(const z of ROADS){const n=nodes.get(key(x,z));if(x<ROAD_LIMIT)link(n,nodes.get(key(x+28,z)),28);if(z<ROAD_LIMIT)link(n,nodes.get(key(x,z+28)),28)}
   const first={...a,edges:[]},last={...b,edges:[]};
   for(const n of neighbors(a))link(first,nodes.get(key(n.x,n.z)),distance(a,n));
   for(const n of neighbors(b))link(last,nodes.get(key(n.x,n.z)),distance(b,n));

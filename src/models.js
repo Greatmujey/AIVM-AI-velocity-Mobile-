@@ -15,7 +15,7 @@ export function createModels(renderer) {
     }));
     return cache.get(name);
   }
-  ['human','human-anims','player-marcus','sedan-sports','motorcycle','cat','dog'].forEach(load);
+  ['human','human-anims','player-marcus','sedan-sports','suv-luxury','taxi','hatchback-sports','motorcycle','cat','dog'].forEach(load);
   function createHuman(gltf, animations, role) {
     const model=cloneSkeleton(gltf.scene);
     // One precomputed mesh LOD per person, rather than rendering all four at once.
@@ -73,12 +73,16 @@ export function createModels(renderer) {
     const actions={idle:idle&&mixer.clipAction(idle),walk:walk&&mixer.clipAction(walk)};actions.idle?.play();group.userData.animalAnimation={mixer,actions,current:actions.idle};
   }
   async function vehicle(vehicle,tint=null) {
-    const gltf=await load(vehicle.type==='bike'?'motorcycle':'sedan-sports');if(!gltf)return;
+    const gltf=await load(vehicle.type==='bike'?'motorcycle':(vehicle.variant||'sedan-sports'));if(!gltf)return;
     const model=gltf.scene.clone(true),bounds=new THREE.Box3().setFromObject(model),size=bounds.getSize(new THREE.Vector3());
     const length=vehicle.type==='bike'?3.25:4.8,scale=length/size.z;
     const visual=new THREE.Group();visual.rotation.y=Math.PI;model.scale.setScalar(scale);model.position.y=-bounds.min.y*scale;visual.add(model);
     model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(tint!==null&&o.material){o.material=o.material.clone();o.material.color.multiply(new THREE.Color(tint))}}});
     for(const child of vehicle.mesh.children)child.visible=false;
+    if(vehicle.type==='car'){
+      const head=new THREE.MeshBasicMaterial({color:0xffe5b1}),tail=new THREE.MeshBasicMaterial({color:0xf15241});
+      for(const x of [-.85,.85])for(const [z,material] of [[-2.37,head],[2.37,tail]]){const lamp=new THREE.Mesh(new THREE.BoxGeometry(.42,.16,.08),material);lamp.position.set(x,.85,z);visual.add(lamp)}
+    }
     vehicle.mesh.add(visual);vehicle.wheels=[];model.traverse(o=>{if(/wheel[-_]/i.test(o.name))vehicle.wheels.push(o)});
     if(vehicle.type==='bike') {
       const [personGltf,animations]=await Promise.all([load('player-marcus'),load('human-anims')]);if(!personGltf||!animations)return;
@@ -107,7 +111,7 @@ export function animatePerson(group,amount,dt,shooting=false,aiming=false,sprint
   a.mixer.update(dt);return true;
 }
 
-export function updateWeapon(group,index){group.userData.weaponIndex=index;const gun=group.userData.model?.userData.gun;if(gun)gun.scale.y=[1,2.3,1.8][index]||1;}
+export function updateWeapon(group,index){group.userData.weaponIndex=index;const gun=group.userData.model?.userData.gun;if(gun)gun.scale.y=[1,2.3,1.8,1.6,2.8][index]||1;}
 
 export function animateAnimal(group,moving,dt) {
   const a=group.userData.animalAnimation;if(!a)return;const next=moving?a.actions.walk:a.actions.idle;

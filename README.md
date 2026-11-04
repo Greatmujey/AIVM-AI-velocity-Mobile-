@@ -1,28 +1,29 @@
 # AIVM — AI Velocity Mobile
 
-AIVM is an original, touch-first 3D city action **prototype**, built with Three.js and Vite. It is not a full GTA- or CODM-scale game. Explore a small city in third person, ride a bike or car, fight enemy bots with three weapons, and complete three short missions. The playable character is a rigged, textured MakeHuman model with distinct idle, walk, sprint and aiming poses, and the street-level camera sits closer to shoulder height. The district has textured surfaces, detailed storefronts, a Palm Grove gateway, low-rise homes, storefronts, a distant business district, ambient pedestrians, traffic, dogs, cats and pigeons. The opening delivery becomes a rival-car pursuit followed by a drop-zone shootout; you can use the bike, car or travel on foot.
+AIVM is an original touch-first 3D city action **prototype** built with Three.js and Vite. It is not a full GTA- or CODM-scale game. The expanded Palm Grove is a stylized neighbourhood, with traffic, pedestrians and animals, a furnished home interior, several distinct landmarks and three linked missions. Main-menu art is an illustration, not an in-game screenshot.
+
+## Play
+
+Start in your home. Tap **Use** (or press E), choose **Leave Home**, and follow the marker to the **Mission Hub**. Tap **Use** there to accept the first job; the following two jobs continue as a chain. Completed missions reward in-game cash. After the final job, choose **Return to City** to explore or replay the jobs. In-game money is fictional; the casino uses no real money.
+
+The home is the only enterable interior. The casino, church, mosque, hotel, friend's house and mission hub are exterior landmarks with simple interaction menus—not fully simulated interiors or multiplayer. The hotel can restore health for in-game cash, the casino offers a simple chance game, and the friend and religious locations are quiet visit points. The mission hub sells two extra guns (SMG and marksman rifle) and a car speed upgrade. Cash and purchases are saved in browser storage when available; mission progress does not persist across reloads.
+
+- **Mobile:** use the left stick to move and drag the view to look. Hold/drag right **Fire**, or use left **Fire**. Tap **Aim**, **Reload**, **Weapon**, and **Use/Ride** near locations or vehicles. Steer with the stick; use **Gas** and **Brake** when driving.
+- **Map:** open it from the main menu or tap the minimap. In free roam, tap a landmark on the full map to set GPS. It shows the complete expanded area; the game pauses while the map is open.
+- **Settings:** choose sound, look sensitivity, aim assist, sound-effects volume, music volume and one of two original synthesized music loops. **Customise Controls** lets you drag touch buttons and save separate portrait and landscape layouts, with on-foot and driving tabs. Settings and layouts stay on the current device when storage is available.
+- **Desktop:** WASD/arrows move, drag to look, Space fires, E uses/rides, Q switches weapon, R reloads, V aims, M opens the map and Shift sprints.
 
 ## Run locally
 
 ```sh
 npm install
 npm run dev
+npm test
+npm run build
 ```
 
-Open the printed URL on a computer or compatible mobile browser. `npm run build` creates a production build. `npm test` tests navigation, combat, map, collision math and saved settings.
+Open the printed URL on a computer or compatible mobile browser. Physical-device performance has not been benchmarked.
 
-## Controls
+## Competition and credits
 
-- **Mobile:** drag the left joystick to move. Drag the open game view to look around. Hold and drag the right **Fire** button to aim while shooting, or use the left **Fire** button while looking with your right thumb. Tap **Aim** to toggle zoom. A quick tap on either fire button fires immediately; holding fires repeatedly. Tap **Settings** below the minimap to adjust **LOOK** sensitivity and turn **ASSIST** or sound on or off. These settings are saved on your device when browser storage is available. Hold **Sprint** to run. Tap the minimap for the full city map; the game pauses until you close it. Tap **Ride** near a vehicle to enter or exit. While driving, steer with the left stick and hold **Gas** or **Brake** (hold Brake to reverse); the stick also supports forward/reverse. Tap **Weapon** to pick a specific gun. Tap **Reload** to reload, or reload automatically when empty; the progress bar shows the reload. Switching weapons or entering a vehicle cancels a reload.
-- **Desktop:** WASD or arrow keys to move/drive, drag the game view to look, Space to fire, E to enter/exit, Q to switch weapons, R to reload, V or right-click to toggle aim, M to open/close the full map, Shift to sprint.
-- Follow the green marker, distance indicator and minimap. The green GPS line follows the street network, and the arrow points to the next turn. Red minimap dots are enemies, including the pursuing car during the first mission. Animals are ambient and cannot be targeted. Combat uses a small reticle-based, line-of-sight aim assist; firing is disabled while riding. Health is partially restored between missions. If you fail, retry the current mission with full health and ammo or start the run over.
-
-## Competition notes
-
-Gameplay footage must be captured from the actual game. This prototype was developed with AI assistance. Check the official competition rules and eligibility before submitting; a public clip of at least 15 seconds tagging @loadoutprotocol is required.
-
-## Assets
-
-Original proprietary GTA and Call of Duty assets are not used. See [CREDITS.md](CREDITS.md) for the included CC0 models, textures, sounds and licenses.
-
-See [design research](docs/DESIGN_RESEARCH.md) for the references, implemented ideas and remaining limitations.
+Gameplay footage must be captured from the actual game. This prototype was developed with AI assistance; check the official competition rules before submitting. Original GTA and Call of Duty assets are not used. See [CREDITS.md](CREDITS.md) for models, textures, sounds and licenses, and [design research](docs/DESIGN_RESEARCH.md) for the references and limitations.
