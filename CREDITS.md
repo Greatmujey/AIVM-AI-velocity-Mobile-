@@ -16,3 +16,6 @@ All assets below are included locally; they are not taken from GTA or Call of Du
 - **City vehicles** (`suv-luxury.glb`, `taxi.glb`, `hatchback-sports.glb`): Kenney Car Kit, CC0 1.0, same source and license as the sports sedan above.
 - **Main menu artwork** (`main-menu.jpg`): original AI-generated illustration created for AIVM; illustrative art, not in-game graphics.
 - **Music**: two original synthesized loops generated in the browser by AIVM.
+
+- **District foliage** (`public/assets/models/nature/`): Kenney Nature Kit, CC0 1.0. Source: [Kenney Nature Kit](https://kenney.nl/assets/nature-kit); GLB mirror: [Hidencod/tge-assets](https://github.com/Hidencod/tge-assets/tree/7be9b573bc74f32ed766b44b3f46550d02ca83b5/packs/nature-kit).
+- **District selector previews** (`public/assets/districts/`): screenshots captured from AIVM itself.

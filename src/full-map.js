@@ -1,4 +1,4 @@
-import { CITY_BOUND, ROAD_LIMIT, LANDMARKS, entrance } from './city-data.js';
+import { CITY_BOUND, ROAD_LIMIT, LANDMARKS, DISTRICTS, entrance } from './city-data.js';
 // The playable city is bounded by -100..100 in both world axes. Keep the full
 // map north-up, with a small margin around those bounds for symbols and labels.
 export const MAP_BOUND = CITY_BOUND + 5;
@@ -13,7 +13,10 @@ export function drawFullMap(canvas, { blocks, position, target, route, enemies, 
   ctx.fillStyle = '#314640'; ctx.fillRect(0, 0, size, size);
   // District backgrounds follow the actual north/south division in world.js.
   const band = (top, bottom, color) => { ctx.fillStyle = color; ctx.fillRect(0, point({x:0,z:top}).y, size, (bottom-top)*scale); };
-  band(-MAP_BOUND, -14, '#39635f'); band(-14, 14, '#8b795c'); band(14, MAP_BOUND, '#688b6b');
+  band(-MAP_BOUND, MAP_BOUND, '#777d67');
+  const districtRect=(x1,z1,x2,z2,color)=>{const a=point({x:x1,z:z1}),b=point({x:x2,z:z2});ctx.fillStyle=color;ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y)};
+  districtRect(-MAP_BOUND,-MAP_BOUND,-56,0,'#3f6c78');districtRect(56,-MAP_BOUND,MAP_BOUND,0,'#618465');
+  districtRect(-MAP_BOUND,0,-56,MAP_BOUND,'#b28e65');districtRect(56,0,MAP_BOUND,MAP_BOUND,'#8ca578');
   ctx.fillStyle = '#7d8982';
   for (let road = -ROAD_LIMIT; road <= ROAD_LIMIT; road += 28) {
     const p = point({x:road,z:road});
@@ -26,6 +29,8 @@ export function drawFullMap(canvas, { blocks, position, target, route, enemies, 
     const p = point(block);
     ctx.fillRect(p.x-block.halfX*scale, p.y-block.halfZ*scale, block.halfX*2*scale, block.halfZ*2*scale);
   }
+  // District pins share the same coordinates used by the selector and GPS.
+  for(const district of DISTRICTS){const p=point(district);ctx.beginPath();ctx.arc(p.x,p.y,13,0,Math.PI*2);ctx.fillStyle=district.color;ctx.fill();ctx.strokeStyle='#172a25';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#172a25';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(({city:'G',village:'V',harbor:'P',hills:'L',desert:'D'})[district.id],p.x,p.y+1)}
   // Key destinations are anchored to the real entrance points.
   for (const place of LANDMARKS) {
     const p = point(entrance(place)); ctx.beginPath(); ctx.arc(p.x,p.y,12,0,Math.PI*2);

@@ -1,15 +1,15 @@
 # AIVM — AI Velocity Mobile
 
-AIVM is an original touch-first 3D city action **prototype** built with Three.js and Vite. It is not a full GTA- or CODM-scale game. The expanded Palm Grove is a stylized neighbourhood, with traffic, pedestrians and animals, a furnished home interior, several distinct landmarks and three linked missions. Main-menu art is an illustration, not an in-game screenshot.
+AIVM is an original touch-first 3D city action **prototype** built with Three.js and Vite. It is not a full GTA- or CODM-scale game. The expanded Palm Grove is a stylized connected city with five different districts (city centre, coastal village, harbor, hills and desert), with traffic, pedestrians and animals, a furnished home interior, several distinct landmarks and three linked missions. Main-menu art is an illustration, not an in-game screenshot.
 
 ## Play
 
-Start in your home. Tap **Use** (or press E), choose **Leave Home**, and follow the marker to the **Mission Hub**. Tap **Use** there to accept the first job; the following two jobs continue as a chain. Completed missions reward in-game cash. After the final job, choose **Return to City** to explore or replay the jobs. In-game money is fictional; the casino uses no real money.
+Choose an environment from the main menu. Its preview is captured from the actual game; all five environments are connected districts of the same map, not separate levels. The hills and dunes are decorative scenery; the playable roads and ground are flat. Start in your home. Tap **Use** (or press E), choose **Leave Home**, and follow the marker to your selected district or to the **Mission Hub**. When a non-city district is selected, the home menu also offers fast travel there. At the **Mission Hub**, tap **Use** to accept the first job; the following two jobs continue as a chain. Completed missions reward in-game cash. After the final job, choose **Return to City** to explore or replay the jobs. In-game money is fictional; the casino uses no real money.
 
 The home is the only enterable interior. The casino, church, mosque, hotel, friend's house and mission hub are exterior landmarks with simple interaction menus—not fully simulated interiors or multiplayer. The hotel can restore health for in-game cash, the casino offers a simple chance game, and the friend and religious locations are quiet visit points. The mission hub sells two extra guns (SMG and marksman rifle) and a car speed upgrade. Cash and purchases are saved in browser storage when available; mission progress does not persist across reloads.
 
 - **Mobile:** use the left stick to move and drag the view to look. Hold/drag right **Fire**, or use left **Fire**. Tap **Aim**, **Reload**, **Weapon**, and **Use/Ride** near locations or vehicles. Steer with the stick; use **Gas** and **Brake** when driving.
-- **Map:** open it from the main menu or tap the minimap. In free roam, tap a landmark on the full map to set GPS. It shows the complete expanded area; the game pauses while the map is open.
+- **Map:** open it from the main menu or tap the minimap. In free roam, tap a landmark or district pin on the full map to set GPS. It shows the complete expanded area; the game pauses while the map is open.
 - **Settings:** choose sound, look sensitivity, aim assist, sound-effects volume, music volume and one of two original synthesized music loops. **Customise Controls** lets you drag touch buttons and save separate portrait and landscape layouts, with on-foot and driving tabs. Settings and layouts stay on the current device when storage is available.
 - **Desktop:** WASD/arrows move, drag to look, Space fires, E uses/rides, Q switches weapon, R reloads, V aims, M opens the map and Shift sprints.
 

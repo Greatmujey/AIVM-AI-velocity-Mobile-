@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { LANDMARKS, ROAD_LIMIT } from './city-data.js';
+import { LANDMARKS, ROAD_LIMIT, districtAt } from './city-data.js';
+import { addDistrictDecor } from './district-decor.js';
 
 // The city is generated locally; licensed character and vehicle models load separately.
 export function createWorld(scene) {
@@ -18,6 +19,14 @@ export function createWorld(scene) {
     mesh.position.set(x,y,z); mesh.castShadow=shadow; mesh.receiveShadow=true; parent.add(mesh); if(collectingStatic&&parent===scene&&!shadow)staticBoxes.push(mesh); return mesh;
   }
   box(390,.4,390,mat(0x6e7970),0,-.3,0,scene,false);
+  addDistrictDecor(scene);
+  // Coloured district ground remains below the road surfaces; roads stay
+  // connected and drivable rather than swapping only the menu backgrounds.
+  const districtGround={village:mat(0x8f9e70),harbor:mat(0x7d8981),hills:mat(0x748b6a),desert:mat(0xbca080)};
+  for(const [kind,x,z] of [['village',106,78],['harbor',-106,-78],['hills',106,-78],['desert',-106,78]])box(100,.08,156,districtGround[kind],x,-.045,z,scene,false);
+  // The harbor shoreline is outside the playable streets, so it is visual
+  // context rather than an unsupported swimming area.
+  const water=mat(0x568c94,{metalness:.1,roughness:.28});box(32,.04,156,water,-179,-.025,-78,scene,false);
   const markGeometry = new THREE.BoxGeometry(.13,.025,2.2);
   const marks = new THREE.InstancedMesh(markGeometry,mat(0xe7d7a6),11*46*2);
   const helper = new THREE.Object3D(); let markCount=0;
@@ -26,9 +35,18 @@ export function createWorld(scene) {
     for(let p=-154;p<=154;p+=7){helper.position.set(n,.07,p);helper.rotation.y=0;helper.updateMatrix();marks.setMatrixAt(markCount++,helper.matrix);helper.position.set(p,.08,n);helper.rotation.y=Math.PI/2;helper.updateMatrix();marks.setMatrixAt(markCount++,helper.matrix)}
   }
   marks.count=markCount;marks.receiveShadow=true;scene.add(marks);
+  // The village and desert use unpaved roads, so the districts differ on the
+  // ground as well as in their buildings. The collision/router grid is unchanged.
+  const sandCanvas=document.createElement('canvas');sandCanvas.width=sandCanvas.height=128;const sandCtx=sandCanvas.getContext('2d');sandCtx.fillStyle='#ded5c3';sandCtx.fillRect(0,0,128,128);let sandSeed=5947;for(let i=0;i<4500;i++){sandSeed=(sandSeed*1664525+1013904223)>>>0;const x=sandSeed%128;sandSeed=(sandSeed*1664525+1013904223)>>>0;const y=sandSeed%128;sandCtx.fillStyle=i%2?'#bdb39a55':'#f9f0da55';sandCtx.fillRect(x,y,1,1)}const sandTex=new THREE.CanvasTexture(sandCanvas);sandTex.colorSpace=THREE.SRGBColorSpace;sandTex.wrapS=sandTex.wrapT=THREE.RepeatWrapping;sandTex.repeat.set(8,16);
+  const villageDirt=mat(0xb6ac88,{map:sandTex}),desertDirt=mat(0xb89470,{map:sandTex});
+  for(const [side,roadMat] of [[1,villageDirt],[-1,desertDirt]]){
+    for(const x of [84,112,140])box(13,.07,156,roadMat,x*side,.06,78,scene,false);
+    for(const z of [28,56,84,112,140])box(100,.07,13,roadMat,106*side,.061,z,scene,false);
+  }
   // Zebra crossings at every junction, drawn in one instanced mesh for mobile.
   const crossing = new THREE.InstancedMesh(new THREE.BoxGeometry(1,.025,.48),mat(0xd4d3bc),11*11*4*6);let crossCount=0;
   for(let x=-ROAD_LIMIT;x<=ROAD_LIMIT;x+=28)for(let z=-ROAD_LIMIT;z<=ROAD_LIMIT;z+=28)for(let j=0;j<6;j++){
+    if(Math.abs(x)>56&&z>0)continue;
     for(const side of [-1,1]){
       helper.rotation.y=0;helper.position.set(x-4.2+j*1.65,.11,z+side*8.2);helper.updateMatrix();crossing.setMatrixAt(crossCount++,helper.matrix);
       helper.rotation.y=Math.PI/2;helper.position.set(x+side*8.2,.11,z-4.2+j*1.65);helper.updateMatrix();crossing.setMatrixAt(crossCount++,helper.matrix);
@@ -105,6 +123,40 @@ export function createWorld(scene) {
     box(w*.8,.18,1.3,roofs[seed%roofs.length],x,3.2,z+d/2+.55,scene,false);box(1.6,2.3,.1,wood,x,1.4,z+d/2+.08,scene,false);
     box(2,.8,1.5,trim,x+2,h+.9,z,scene,false);
   }
+  // District landmarks and neighbourhood architecture share the same
+  // collision footprints as other structures; decorative detail stays in lots.
+  const villageWalls=[mat(0xe6c99a),mat(0xd9a478),mat(0xbabf99)],thatch=mat(0x9a774c), corrugated=mat(0x687e7c),
+    containerMats=[mat(0xb65e44),mat(0x557a83),mat(0xb8a15b)], sandWalls=[mat(0xd8a374),mat(0xc48f6b)], rock=mat(0x848b76);
+  const roofCone=new THREE.ConeGeometry(6.4,2.7,10);
+  function villageHome(x,z,seed){
+    structure(9,3.8,9,x,z,villageWalls[seed%villageWalls.length]);
+    const roof=new THREE.Mesh(roofCone,thatch);roof.position.set(x,5.1,z);roof.rotation.y=Math.PI/4;roof.receiveShadow=true;scene.add(roof);
+    box(1.2,2.2,.12,wood,x,1.35,z+4.56,scene,false);for(const side of [-1,1])box(1.5,1,.1,windowMat,x+side*2.7,2.1,z+4.57,scene,false);
+    box(2.3,.15,1.1,concrete,x,.25,z+5,scene,false);box(1.5,.45,1.2,greenery,x+5.3,.35,z+4.9,scene,false);
+  }
+  function harborWarehouse(x,z,seed){
+    structure(11,5.6,10.5,x,z,containerMats[seed%containerMats.length]);box(11.6,.28,11,corrugated,x,6.05,z,scene,false);
+    box(3,3.2,.12,trim,x,1.9,z+5.35,scene,false);for(const side of [-1,1]){box(1.8,1.2,.12,windowMat,x+side*3.3,3.2,z+5.35,scene,false);}
+    for(let i=-2;i<=2;i++)box(.08,4.9,.1,concrete,x+i*2,3.05,z+5.42,scene,false);
+    // Stacked cargo and small gantries make the dock silhouette unmistakable.
+    box(4,1.7,2.4,containerMats[(seed+1)%3],x-2.3,6.95,z,scene,false);box(3.6,1.6,2.2,containerMats[(seed+2)%3],x+2.2,6.9,z-1,scene,false);
+    if(seed%3===0){for(const side of [-1,1])box(.3,7,.3,trim,x+side*4.6,9.4,z-3.5,scene,false);box(10,.3,.3,trim,x,12.9,z-3.5,scene,false);}
+  }
+  function hillsideHome(x,z,seed){
+    structure(9.5,4.2,9.5,x,z,villageWalls[(seed+1)%3]);gableRoof(x,4.5,z,10.6,10.4,roofs[2]);
+    box(1.2,2.2,.12,wood,x,1.35,z+4.85,scene,false);for(const side of [-1,1])box(1.6,1,.1,windowMat,x+side*2.9,2.1,z+4.85,scene,false);
+  }
+  function desertHome(x,z,seed){
+    structure(10,3.8,9,x,z,sandWalls[seed%2]);box(10.5,.35,9.5,sandWalls[(seed+1)%2],x,4.2,z,scene,false);
+    box(1.4,2.2,.12,wood,x,1.35,z+4.58,scene,false);for(const side of [-1,1])box(1.4,1.1,.12,windowMat,x+side*3,2.1,z+4.58,scene,false);
+    box(1.8,.3,1.8,rock,x-5.2,.3,z-4.8,scene,false);
+  }
+  // Distant ridges frame the outskirts but are not climbable gameplay terrain.
+  const mountainGeometry=new THREE.SphereGeometry(1,10,7);
+  for(let i=0;i<5;i++)for(const [x,z,m] of [[185,-125+i*27,rock],[-185,25+i*27,sandWalls[0]]]){const peak=new THREE.Mesh(mountainGeometry,m);peak.position.set(x,-1,z);peak.scale.set(22,13+(i%3)*2,19);scene.add(peak)}
+  // Harbor gantries stand at the shoreline, clear of the playable road.
+  const cranePaint=mat(0xc48a4c);for(const z of [-126,-70,-14]){for(const side of [-1,1])box(.65,17,.65,cranePaint,-159,8.5,z+side*5,scene,false);box(.8,.7,12,cranePaint,-159,17,z,scene,false);box(9,.6,.6,cranePaint,-163,17,z,scene,false);box(.1,8,.1,trim,-166,13,z,scene,false);}
+
   function specialBuilding(place){
     const {x,z,kind,name}=place, h=kind==='hotel'?12:kind==='casino'?7:kind==='church'||kind==='mosque'?6:4.6;
     const facade=mat(({home:0xe2b99a,hub:0x4d8e87,friend:0xd49d8a,church:0xe5dbca,mosque:0xd2d7c2,hotel:0xe5aa83,casino:0x985576})[kind],{map:wallDetail});
@@ -119,9 +171,13 @@ export function createWorld(scene) {
   }
   for(let x=-126;x<=126;x+=28)for(let z=-126;z<=126;z+=28){
     const xi=(x+126)/28,zi=(z+126)/28,seed=(xi*37+zi*53+xi*zi*19)%113;
-    box(15,.25,15,pavement,x,.1,z,scene,false);
+    const district=districtAt(x,z);box(15,.25,15,districtGround[district]||pavement,x,.1,z,scene,false);
     const landmark=LANDMARKS.find(p=>p.x===x&&p.z===z);
     if(landmark)specialBuilding(landmark);
+    else if(district==='village')villageHome(x,z,seed);
+    else if(district==='harbor')harborWarehouse(x,z,seed);
+    else if(district==='hills')hillsideHome(x,z,seed);
+    else if(district==='desert')desertHome(x,z,seed);
     else if(z>=14)house(x,z,seed);
     else if(z>=-14||seed%3===0)store(x,z,seed);
     else apartment(x,z,seed);
@@ -153,6 +209,12 @@ export function createWorld(scene) {
     const tx=x+6.4,tz=z-6.4,height=7+(seed%3);const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.14,.35,height,7),bark);trunk.position.set(tx,height/2,tz);trunk.rotation.z=.035;trunk.castShadow=true;scene.add(trunk);
     for(let i=0;i<7;i++){const frond=new THREE.Mesh(frondGeom,leaf);frond.position.set(tx,height,tz);frond.rotation.y=i*Math.PI*2/7;frond.castShadow=true;scene.add(frond)}
   }
+  // Palms are clustered in the village lots and along the coastline, not in
+  // driving lanes. They make the district recognisable at street level.
+  for(const x of [92,120,148])for(const z of [52,80,108,136]){
+    const height=7+((x+z)%3);const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.14,.3,height,7),bark);trunk.position.set(x,height/2,z);trunk.rotation.z=.07;scene.add(trunk);
+    for(let i=0;i<6;i++){const frond=new THREE.Mesh(frondGeom,leaf);frond.position.set(x,height,z);frond.rotation.y=i*Math.PI/3;scene.add(frond)}
+  }
   // Sidewalk details remain decorative and leave travel lanes clear.
   const post=mat(0xb75d3e), metalDetail=mat(0x9fafa4), shrub=mat(0x6a8058);
   for(let x=-56;x<=56;x+=56)for(let z=-56;z<=56;z+=56){
@@ -181,7 +243,7 @@ export function createWorld(scene) {
   // Utility poles and overhead cables add depth along the residential streets.
   const cable=mat(0x403c36);for(let z=-56;z<=56;z+=28){box(.16,7,.16,wood,-6.8,3.5,z,scene,false);box(1.4,.14,.14,wood,-6.8,6.7,z,scene,false);if(z<56)box(.05,.05,28,cable,-6.8,6.7,z+14,scene,false)}
   // Distant silhouettes frame the horizon without affecting navigation.
-  const skyline=mat(0x667b81);for(let i=0;i<32;i++){const a=i/32*Math.PI*2,dist=235,h=18+(i*19%38);box(13,h,13,skyline,Math.sin(a)*dist,h/2,Math.cos(a)*dist,scene,false)}
+  const skyline=mat(0x667b81);for(let i=0;i<10;i++){const h=18+(i*19%38);box(13,h,13,skyline,-70+i*15,h/2,-187,scene,false)}
   // Batch decorative static boxes by material and 56m cell, retaining frustum
   // culling and leaving collision/raycast building meshes untouched.
   collectingStatic=false;
