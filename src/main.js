@@ -6,6 +6,7 @@ import { roadRoute } from './gps.js';
 import { drawFullMap } from './full-map.js';
 import { loadPreferences, savePreferences } from './preferences.js';
 import { advancePursuit } from './pursuit.js';
+import { turnTowards } from './locomotion.js';
 import { movePosition, hasLineOfSight, relativeMovement, objectiveDirection } from './navigation.js';
 import './style.css';
 
@@ -174,7 +175,7 @@ function shoot(){
  $('crosshair').classList.remove('shot');void $('crosshair').offsetWidth;$('crosshair').classList.add('shot');
 }
 function hit(amount){if(ended)return;health=Math.max(0,health-amount);$('damage').classList.add('hit');setTimeout(()=>$('damage').classList.remove('hit'),180);if(health<=0)finish(false)}
-function animateWalk(person,amount,time,dt,shooting=false,aiming=false,sprinting=false){if(animatePerson(person,amount,dt,shooting,aiming,sprinting))return;const a=Math.sin(time*9)*.65*amount;person.userData.leftLeg.rotation.x=a;person.userData.rightLeg.rotation.x=-a;person.userData.leftArm.rotation.x=-a*.7;person.userData.rightArm.rotation.x=a*.25;}
+function animateWalk(person,amount,time,dt,shooting=false,aiming=false,sprinting=false,actualSpeed=0){if(animatePerson(person,amount,dt,shooting,aiming,sprinting,actualSpeed))return;const a=Math.sin(time*9)*.65*amount;person.userData.leftLeg.rotation.x=a;person.userData.rightLeg.rotation.x=-a;person.userData.leftArm.rotation.x=-a*.7;person.userData.rightArm.rotation.x=a*.25;}
 function updateEnemies(dt){
  const pos=vehicle?vehicle.mesh.position:player.position;
  for(const e of enemies){if(!e.alive)continue;const d=e.mesh.position.distanceTo(pos);e.bar.visible=d<40&&hasLineOfSight(e.mesh.position,pos,world.blocks);e.bar.quaternion.copy(e.mesh.quaternion).invert().multiply(camera.quaternion);e.fill.scale.x=Math.max(0,e.hp/100);e.fill.position.x=(e.fill.scale.x-1)*.7;if(d>=44)continue;e.mesh.rotation.y=Math.atan2(e.mesh.position.x-pos.x,e.mesh.position.z-pos.z);let moving=0;
@@ -242,7 +243,10 @@ function animate(){requestAnimationFrame(animate);const elapsed=clock.getDelta()
    for(const wheel of vehicle.wheels)wheel.rotation.x-=vehicleSpeed*dt*.8;player.position.copy(vehicle.mesh.position);
    if(lookPointer===null&&Math.abs(vehicleSpeed)>1){let delta=Math.atan2(Math.sin(vehicle.mesh.rotation.y-cameraYaw),Math.cos(vehicle.mesh.rotation.y-cameraYaw));cameraYaw+=delta*Math.min(1,dt*2)}
   }else{
-   const move=relativeMovement(inputX,inputZ,cameraYaw);if(len>.08){const speed=(sprintHeld||keys.ShiftLeft||keys.ShiftRight)?10:6.3;movePosition(player.position,move.x*speed*dt,move.z*speed*dt,world.blocks);if(!fireHeld&&!aiming)player.rotation.y=Math.atan2(-move.x,-move.z);walkCycle+=dt*(speed/6.3)}animateWalk(player,Math.min(len,1),walkCycle,dt,fireHeld,aiming,sprintHeld||keys.ShiftLeft||keys.ShiftRight);
+   const move=relativeMovement(inputX,inputZ,cameraYaw),sprinting=!!(sprintHeld||keys.ShiftLeft||keys.ShiftRight),speed=sprinting?6.6:2.4;
+   let actualSpeed=0;
+   if(len>.08){const travelled=movePosition(player.position,move.x*speed*dt,move.z*speed*dt,world.blocks);actualSpeed=dt>0?travelled/dt:0;if(!fireHeld&&!aiming)player.rotation.y=turnTowards(player.rotation.y,Math.atan2(-move.x,-move.z),dt);walkCycle+=dt*(speed/2.4)}
+   animateWalk(player,Math.min(actualSpeed/speed,1),walkCycle,dt,fireHeld,aiming,sprinting,actualSpeed);
   }
   if(aiming&&!vehicle)player.rotation.y=cameraYaw;if(fireHeld)shoot();if(reloadEnd&&gameTime>=reloadEnd){ammo[weaponIndex]=weapons[weaponIndex].cap;reloadEnd=0}updateEnemies(dt);if(!ended)updateMission();if(!ended)updateRival(dt);if(!ended){const cityPos=vehicle?vehicle.mesh.position:player.position;updateCity(dt,cityPos);updateAnimals(dt,cityPos);}if(!ended&&mission===2&&gameTime-lastReinforcement>16&&enemies.filter(e=>e.alive&&e.kind==='pursuer').length<5){const p=vehicle?vehicle.mesh.position:player.position;const z=Math.round(p.z/28)*28;const x=Math.max(-84,Math.min(84,Math.round(p.x/28)*28+(p.x<target.x?-28:28)));spawnEnemy(x,z,'pursuer');lastReinforcement=gameTime;showToast('ENEMY REINFORCEMENTS INBOUND')}
   for(let i=shots.length-1;i>=0;i--)if(shots[i].until<gameTime){scene.remove(shots[i].line);shots[i].line.geometry.dispose();shots[i].line.material.dispose();shots.splice(i,1)}
@@ -264,7 +268,7 @@ if(import.meta.env.DEV) window.__aivmTest={
   health(value){health=value},
   fail(){health=0;finish(false)},
   defeatGuards(){enemies.filter(e=>e.alive&&(e.kind==='guard'||e.kind==='drop-guard')).forEach(e=>damageEnemy(e,100))},
-  playerStatus(){const a=player.userData.animation;return {loaded:!!a,role:a?.role,action:a?.current?.getClip().name||null,gun:!!player.userData.model?.userData.gun,visible:player.visible}},
+  playerStatus(){const a=player.userData.animation;return {loaded:!!a,role:a?.role,action:a?.current?.getClip().name||null,gun:!!player.userData.model?.userData.gun,visible:player.visible,rate:a?.current?.getEffectiveTimeScale()||0,time:a?.current?.time||0,rotation:player.rotation.y,leftLeg:a?.model?.getObjectByName('mixamorigLeftUpLeg')?.quaternion.toArray(),rightLeg:a?.model?.getObjectByName('mixamorigRightUpLeg')?.quaternion.toArray()}},
   animalStatus(){return animals.map(a=>({type:a.type,x:a.mesh.position.x,z:a.mesh.position.z,loaded:!!a.mesh.userData.animalAnimation}))},
   renderInfo(){return {calls:renderer.info.render.calls,triangles:renderer.info.render.triangles}},
   targets(){return enemies.filter(e=>e.alive).map(e=>{const p=e.mesh.position.clone().add(new THREE.Vector3(0,1.35,0)).project(camera);return {x:(p.x+1)*innerWidth/2,y:(1-p.y)*innerHeight/2,hp:e.hp,kind:e.kind}})}

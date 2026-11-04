@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
+import { makeNaturalWalkClip, walkPlaybackRate } from './locomotion.js';
 
 // Models are local CC0 assets. Procedural placeholders remain if loading fails.
 export function createModels(renderer) {
@@ -37,7 +38,11 @@ export function createModels(renderer) {
     visual.userData.flashMaterials=flashMaterials;
     const mixer=new THREE.AnimationMixer(model), actions={};
     for(const clip of animations.animations)actions[clip.name]=mixer.clipAction(clip);
-    if(role==='player')for(const clip of gltf.animations)if(clip.name==='Idle'||clip.name==='Walk')actions[clip.name]=mixer.clipAction(clip);
+    if(role==='player'){
+      const idle=gltf.animations.find(clip=>clip.name==='Idle'),walk=gltf.animations.find(clip=>clip.name==='Walk');
+      if(idle)actions.Idle=mixer.clipAction(idle);
+      if(walk&&idle)actions.NaturalWalk=mixer.clipAction(makeNaturalWalkClip(walk,idle));
+    }
     const initial=actions[role==='player'?'Idle':role.startsWith('civilian')?'unarmed_idle':'idle']||actions.idle;
     initial?.play();
     if(role==='player'||role==='enemy'){
@@ -87,17 +92,18 @@ export function createModels(renderer) {
 export function personAnimationName(role, amount, shooting=false, aiming=false, sprinting=false) {
   if (shooting) return 'fire';
   if (aiming) return amount > .1 ? 'walk' : 'aim_idle';
-  if (role === 'player') return amount > .1 ? (sprinting ? 'unarmed_run' : 'Walk') : 'Idle';
+  if (role === 'player') return amount > .1 ? (sprinting ? 'unarmed_run' : 'NaturalWalk') : 'Idle';
   if (role === 'enemy') return amount > .1 ? 'run' : 'idle';
   if (amount > .1) return sprinting ? 'unarmed_run' : 'unarmed_walk';
   return 'unarmed_idle';
 }
 
-export function animatePerson(group,amount,dt,shooting=false,aiming=false,sprinting=false) {
+export function animatePerson(group,amount,dt,shooting=false,aiming=false,sprinting=false,actualSpeed=0) {
   const a=group.userData.animation;if(!a)return false;
   const name=personAnimationName(a.role,amount,shooting,aiming,sprinting);
   const action=a.actions[name]||a.actions.idle;
   if(action&&action!==a.current){a.current?.fadeOut(.15);action.reset().fadeIn(.15).play();a.current=action}
+  if(a.role==='player'&&(name==='NaturalWalk'||name==='unarmed_run'))action.setEffectiveTimeScale(walkPlaybackRate(actualSpeed,sprinting));
   a.mixer.update(dt);return true;
 }
 
