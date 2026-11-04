@@ -41,7 +41,7 @@ export function createModels(renderer) {
     if(role==='player'){
       const idle=gltf.animations.find(clip=>clip.name==='Idle'),walk=gltf.animations.find(clip=>clip.name==='Walk');
       if(idle)actions.Idle=mixer.clipAction(idle);
-      if(walk&&idle)actions.NaturalWalk=mixer.clipAction(makeNaturalWalkClip(walk,idle));
+      if(walk&&idle)actions.NaturalWalk=mixer.clipAction(makeNaturalWalkClip(walk,idle,animations.animations.find(clip=>clip.name==='unarmed_walk'),model));
     }
     const initial=actions[role==='player'?'Idle':role.startsWith('civilian')?'unarmed_idle':'idle']||actions.idle;
     initial?.play();
