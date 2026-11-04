@@ -151,3 +151,50 @@
 .speech-bubble[hidden]{display:none}
 @keyframes bubble-in{from{opacity:0;transform:translate(-50%,-92%) scale(.94)}to{opacity:1;transform:translate(-50%,-100%) scale(1)}}
 @media (max-width:520px){.speech-bubble{max-width:56vw;font-size:11px;padding:5px 8px 6px}}
+
+/* --- Wave 6: casino tables you can watch ---------------------------------- */
+.casino-lobby{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}
+.casino-tile{display:flex;flex-direction:column;gap:6px;align-items:flex-start;padding:14px;border-radius:14px;background:linear-gradient(160deg,#123326,#0d241c);border:1px solid #2c5a44;color:#eafff3;text-align:left;font:inherit}
+.casino-tile-icon{font-size:26px;line-height:1}
+.casino-tile b{font-size:15px;letter-spacing:.06em}
+.casino-tile small{color:#9fd8bb;font-size:11px;line-height:1.35}
+.casino-balance{font-weight:800;letter-spacing:.05em;color:#c9fc51;margin:6px 0 2px}
+.casino-result{min-height:22px;color:#ffe9a8;font-weight:700;letter-spacing:.03em;margin:4px 0}
+.casino-stakes{margin:4px 0 8px}
+.casino-stakes .chosen{outline:2px solid #c9fc51}
+.casino-table{min-height:168px;display:grid;place-items:center;padding:16px 12px;border-radius:16px;background:radial-gradient(120% 90% at 50% 0%,#1d5238,#0e2b1e 72%);border:1px solid #2c5a44;margin:6px 0 10px;overflow:hidden;position:relative}
+.casino-actions{justify-content:center}
+/* coin */
+.coin-stage{perspective:640px;height:132px;display:grid;place-items:center}
+.coin{position:relative;width:86px;height:86px;transform-style:preserve-3d}
+.coin-face{position:absolute;inset:0;border-radius:50%;display:grid;place-items:center;font-size:36px;font-weight:900;backface-visibility:hidden;border:4px solid #8a6a1f}
+.coin-face.heads{background:radial-gradient(circle at 35% 30%,#ffe9a0,#d8a92c 72%);color:#5c4408}
+.coin-face.tails{background:radial-gradient(circle at 35% 30%,#eceef2,#9aa0ad 72%);color:#3a3f4a;transform:rotateX(180deg)}
+.coin.flipping{animation:coin-toss 1.25s cubic-bezier(.32,.55,.4,1)}
+@keyframes coin-toss{0%{transform:translateY(0) rotateX(0)}45%{transform:translateY(-72px) rotateX(calc(var(--spin-end,1800deg)*.5))}100%{transform:translateY(0) rotateX(var(--spin-end,1800deg))}}
+/* die */
+.dice-stage{height:132px;display:grid;place-items:center;width:100%}
+.die{width:76px;height:76px;border-radius:14px;background:linear-gradient(150deg,#ffffff,#d9dde2);box-shadow:0 10px 20px #0009,inset 0 -6px 0 #0002;display:grid;place-items:center}
+.pips{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);width:52px;height:52px}
+.pip{border-radius:50%;margin:4px}
+.pip.on{background:#20242a;box-shadow:inset 0 -2px 2px #0007}
+.die.rolling{animation:die-roll 1.3s cubic-bezier(.25,.6,.35,1)}
+@keyframes die-roll{0%{transform:translateX(-118px) rotate(0)}30%{transform:translateX(62px) rotate(260deg)}60%{transform:translateX(-42px) rotate(480deg)}82%{transform:translateX(26px) rotate(660deg)}100%{transform:translateX(0) rotate(720deg)}}
+/* slots */
+.slots{display:flex;gap:10px;padding:16px 14px;border-radius:14px;background:#191922;border:3px solid #d8a92c;box-shadow:0 8px 22px #0008}
+.reel{width:66px;height:78px;border-radius:10px;background:linear-gradient(#ffffff,#cfd4da);display:grid;place-items:center;overflow:hidden;box-shadow:inset 0 6px 10px #0004,inset 0 -6px 10px #0004}
+.reel-window{font-size:42px;line-height:1}
+.reel-window.spinning{filter:blur(2px);animation:reel-jitter .12s linear infinite}
+@keyframes reel-jitter{0%{transform:translateY(-7px)}100%{transform:translateY(7px)}}
+/* wheel */
+.wheel-stage{height:186px;display:grid;place-items:center}
+.wheel{position:relative;width:168px;height:168px;border-radius:50%;border:6px solid #d8a92c;box-shadow:0 12px 26px #000a}
+.wheel-glow{position:absolute;inset:0;border-radius:50%;opacity:0;transition:opacity .35s}
+.wheel-pointer{position:absolute;left:50%;top:-16px;width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-top:18px solid #ffe9a0;transform:translateX(-50%);z-index:2;filter:drop-shadow(0 2px 2px #000a)}
+.wheel-hub{position:absolute;inset:37%;border-radius:50%;background:radial-gradient(circle at 35% 30%,#2a3238,#12161a);color:#c9fc51;display:grid;place-items:center;font-weight:900;font-size:12px;letter-spacing:.08em}
+@media (max-width:520px){.casino-lobby{grid-template-columns:1fr 1fr}.casino-table{min-height:150px}.wheel{width:150px;height:150px}.wheel-stage{height:168px}}
+
+/* --- Wave 6: the one true logo -------------------------------------------- */
+.menu-logo{width:min(82vw,470px);margin:6px 0 2px;filter:drop-shadow(0 14px 34px #000c) drop-shadow(0 0 22px #c9fc5122);animation:logo-in .7s cubic-bezier(.2,.9,.3,1.2) both}
+@keyframes logo-in{from{opacity:0;transform:translateY(14px) scale(.94)}to{opacity:1;transform:none}}
+.brand-logo{height:38px;width:auto;filter:drop-shadow(0 2px 8px #000d)}

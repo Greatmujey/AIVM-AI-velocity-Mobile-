@@ -16,6 +16,7 @@ import { streetConversation, applyStreetEffect, nearestLandmarkId } from './stre
 import { createHome, HOME_CENTER } from './home.js';
 import { createInteriors } from './interiors.js';
 import { moveInside } from './interior-collision.js';
+import { createInteriorLife, stepInteriorLife } from './interior-life.js';
 import { createCasino } from './casino-ui.js';
 import { advanceVehicleSpeed } from './driving.js';
 import { startActivity, advanceActivity } from './activities.js';
@@ -32,7 +33,7 @@ import './style.css';
 document.querySelector('#app').innerHTML = `
 <canvas id="game" aria-label="3D game view. Drag to look around."></canvas><div class="vignette"></div><div class="damage" id="damage"></div>
 <div class="hud" id="hud">
- <div class="top"><div><div class="brand"><div class="brand-icon">↗</div><div><div class="brand-name">AI<span>VM</span></div><div class="brand-sub">AI VELOCITY MOBILE</div></div></div><div class="mission"><div class="eyebrow" id="mission-number">MISSION 01 / 03</div><h2 id="mission-title">FIRST DELIVERY</h2><p id="objective">Take the bike and pick up the package.</p><div class="count" id="mission-count"></div></div></div><div class="right-hud"><div class="cash-display" id="cash-display">$0</div><div class="heat"><small>HEAT</small><strong id="heat">☆☆☆</strong></div><div><button class="map-wrap" id="open-map" aria-label="Open full city map" aria-haspopup="dialog"><canvas id="map" width="200" height="200"></canvas><span class="map-label">N ↑</span><span class="map-tap">TAP MAP</span></button><div class="map-note">● YOU &nbsp; ◆ GOAL &nbsp; — GPS</div><button class="settings-button" id="game-menu-button" aria-haspopup="dialog">☰ GAME MENU</button><button class="settings-button" id="settings-button" aria-expanded="false" aria-controls="settings-panel">⚙ SETTINGS</button></div></div></div>
+ <div class="top"><div><div class="brand"><img class="brand-logo" src="${import.meta.env.BASE_URL}assets/logo.png" alt="AIVM — AI Velocity Mobile"></div><div class="mission"><div class="eyebrow" id="mission-number">MISSION 01 / 03</div><h2 id="mission-title">FIRST DELIVERY</h2><p id="objective">Take the bike and pick up the package.</p><div class="count" id="mission-count"></div></div></div><div class="right-hud"><div class="cash-display" id="cash-display">$0</div><div class="heat"><small>HEAT</small><strong id="heat">☆☆☆</strong></div><div><button class="map-wrap" id="open-map" aria-label="Open full city map" aria-haspopup="dialog"><canvas id="map" width="200" height="200"></canvas><span class="map-label">N ↑</span><span class="map-tap">TAP MAP</span></button><div class="map-note">● YOU &nbsp; ◆ GOAL &nbsp; — GPS</div><button class="settings-button" id="game-menu-button" aria-haspopup="dialog">☰ GAME MENU</button><button class="settings-button" id="settings-button" aria-expanded="false" aria-controls="settings-panel">⚙ SETTINGS</button></div></div></div>
  <div class="navigation" id="navigation"><span id="direction-arrow">▲</span><span id="distance">0 M</span><small>OBJECTIVE</small></div><div class="crosshair" id="crosshair"><i></i><i></i><i></i><i></i></div><div class="target-name" id="target-name"></div><div class="hitmarker" id="hitmarker">×</div>
  <div class="bottom-left"><div class="status"><div class="status-top"><span class="status-label">HEALTH</span><span class="health-num" id="health">100</span></div><div class="health-track"><div class="health-fill" id="health-fill"></div></div><div class="weapon-name" id="weapon">PISTOL</div><div class="weapon-sub" id="weapon-sub">AIM ASSIST ON</div><div class="reload-track" id="reload-track" role="progressbar" aria-label="Reload progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="reload-fill"></div></div></div><div class="ammo" id="ammo">12 <small>/ ∞</small></div></div>
  <button class="action left-fire" id="left-fire-btn" aria-label="Fire with left hand"><span class="ico fire-icon"></span><span class="lbl">FIRE</span></button>
@@ -45,7 +46,7 @@ document.querySelector('#app').innerHTML = `
  <div class="map-body"><div class="full-map-wrap"><canvas id="full-map" width="630" height="630" aria-label="North-up map showing the complete city streets, buildings and current objective"></canvas><span class="full-map-north">N ↑</span></div>
  <div class="map-legend"><strong>LEGEND</strong><span><b class="legend-you">▲</b> YOU</span><span><b class="legend-goal">◆</b> OBJECTIVE</span><span><b class="legend-route">━</b> GPS ROUTE</span><span><b class="legend-enemy">●</b> ENEMY</span><span><b class="legend-vehicle">■</b> VEHICLE</span><span><b style="color:#72e2b6">●</b> HOME</span><span><b style="color:#f4d46c">●</b> MISSION HUB</span><span><b style="color:#ee85bd">●</b> CITY PLACES</span><small class="place-list" id="map-legend-list">H HOME · M MISSION HUB<br>TAP A PIN FOR GPS (FREE ROAM)</small><small>GAME PAUSED<br>North is up.</small></div></div></div>
 </div>
-<div class="screen main-menu" id="intro"><div class="menu-shade"></div><div class="menu-content"><div class="menu-kicker">AIVM / PALM GROVE CITY</div><h1>AI<span>VM</span></h1><div class="menu-sub">AI VELOCITY MOBILE</div><p>YOUR CITY. YOUR STORY.</p><div class="menu-actions"><button class="primary" id="start">PLAY <span>↗</span></button><button class="menu-button" id="menu-districts">ENVIRONMENTS <span id="district-choice">CITY CENTRE</span></button><button class="menu-button" id="menu-activities">GAME MENU <span>↗</span></button><button class="menu-button" id="menu-map">CITY MAP <span>↗</span></button><button class="menu-button" id="menu-settings">SETTINGS <span>⚙</span></button></div><div class="menu-meta"><span>OPEN WORLD PROTOTYPE</span><span>MENU ART IS AN ILLUSTRATION</span></div></div></div>
+<div class="screen main-menu" id="intro"><div class="menu-shade"></div><div class="menu-content"><div class="menu-kicker">PALM GROVE CITY</div><img class="menu-logo" src="${import.meta.env.BASE_URL}assets/logo.png" alt="AIVM — AI Velocity Mobile"><p>YOUR CITY. YOUR STORY.</p><div class="menu-actions"><button class="primary" id="start">PLAY <span>↗</span></button><button class="menu-button" id="menu-districts">ENVIRONMENTS <span id="district-choice">CITY CENTRE</span></button><button class="menu-button" id="menu-activities">GAME MENU <span>↗</span></button><button class="menu-button" id="menu-map">CITY MAP <span>↗</span></button><button class="menu-button" id="menu-settings">SETTINGS <span>⚙</span></button></div><div class="menu-meta"><span>OPEN WORLD PROTOTYPE</span><span>MENU ART IS AN ILLUSTRATION</span></div></div></div>
 <div class="district-overlay" id="district-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="district-title"><section class="district-panel"><div class="district-head"><div><small>ONE CONNECTED CITY · SEVEN DISTRICTS</small><h2 id="district-title">CHOOSE YOUR ENVIRONMENT</h2><p id="district-help">Swipe to explore. These are views from the game, not separate maps.</p></div><button id="district-close" class="dialog-close" aria-label="Close environment selection">✕</button></div><div class="district-scroll" id="district-scroll" aria-label="Available districts"></div><div class="district-footer"><span id="district-caption">Selected: Palm Grove</span><button id="district-travel" hidden>TRAVEL NOW ↗</button><button id="district-confirm">CONFIRM DISTRICT ↗</button></div></section></div>
 <div class="game-menu-overlay" id="game-menu-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="game-menu-title"><section class="game-menu-card"><div class="dialog-head"><div><small>EXPLORE AIVM</small><h2 id="game-menu-title">GAME MENU</h2></div><button id="game-menu-close" class="dialog-close" aria-label="Close game menu">✕</button></div><p id="game-menu-note"></p><div id="game-menu-grid" class="game-menu-grid"></div></section></div>
 <div class="arcade-overlay" id="arcade-overlay" hidden role="dialog" aria-modal="true" aria-label="Arcade"><section class="arcade-panel" id="arcade-panel"></section></div>
@@ -134,13 +135,33 @@ for(const [i,c] of civilians.entries()){
 }
 // Rooms are populated too: every enterable place has its own small crowd, and
 // pairs inside face each other exactly like the street conversations.
-const interiorPeople={};
+const interiorPeople={},interiorLife={};
 for(const [id,room] of Object.entries(interiors)){
   const spots=interiorSpots[id]||[];
-  interiorPeople[id]=spots.map((spot,i)=>{
-    const mesh=world.simplePerson(0x718b94);mesh.position.set(spot.x,0,spot.z);mesh.rotation.y=spot.ry;mesh.visible=false;room.add(mesh);
-    return {mesh,role:spot.role,ry:spot.ry,requested:false,walk:i*1.3,animElapsed:0,talkPhase:i*2.1,x:spot.x,z:spot.z};
+  const life=createInteriorLife(spots,{seed:id.length*13+spots.length*5+7});
+  interiorLife[id]=life;
+  interiorPeople[id]=life.map((agent,i)=>{
+    const mesh=world.simplePerson(0x718b94);mesh.position.set(agent.x,0,agent.z);mesh.rotation.y=agent.ry;mesh.visible=false;room.add(mesh);
+    return {mesh,role:agent.role,ry:agent.ry,requested:false,walk:i*1.3,animElapsed:0,talkPhase:i*2.1,x:agent.x,z:agent.z,agent};
   });
+}
+// Doors turn over all over the city: when somebody leaves a room they step out
+// onto the pavement as a real pedestrian, and coming back in absorbs one walker
+// who was passing the door — so places breathe from both sides.
+const lifeStats={talks:0,exits:0,enters:0};
+function doorEvent(id,event){
+  const place=landmarkById(id);if(!place)return;
+  const door=entrance(place);
+  if(event.type==='exit'){
+    if(civilians.length>195)return;
+    const x=door.x+(cityRandom()-.5)*2.4,z=door.z+1.6;
+    const mesh=world.simplePerson(0x718b94);mesh.position.set(x,0,z);mesh.rotation.y=0;mesh.visible=false;scene.add(mesh);
+    civilians.push({x,z,ry:0,dir:1,speed:1.8,mode:'walk',district:districtAt(x,z),role:'civilian-warm',lane:{axis:'z',fixed:x,from:Math.max(-138,z-32),to:Math.min(138,z+32)},anchor:null,radius:0,pause:0,think:3,line:null,lineUntil:0,cooldown:gameTime+8,partner:null,mesh,walk:0,requested:false,animElapsed:0,doorful:true,id:civilians.length+2000});
+  }else{
+    let best=null,bestDistance=9;
+    for(const c of civilians){if(c.doorful)continue;const d=Math.hypot(c.x-door.x,c.z-door.z);if(d<bestDistance){bestDistance=d;best=c}}
+    if(best){scene.remove(best.mesh);civilians.splice(civilians.indexOf(best),1)}
+  }
 }
 const interiorCrowd=id=>interiorPeople[id]||[];
 // Speech bubbles for nearby conversations, projected over the canvas.
@@ -487,11 +508,11 @@ function reportCrime(reason){
  heat=Math.min(3,heat+1);updateHeat();lastCrimeReport=gameTime;lastSeenByPolice=gameTime;
  showToast(reason);sound('reload');
 }
-let arcadeOrigin='place',arcadeSession=0,casinoOpen=false,conversationInside=false;
+let arcadeOrigin='place',arcadeSession=0,casinoOpen=false,conversationInside=false,casinoHandle=null;
 async function openArcade(origin='place'){const session=++arcadeSession;arcadeOrigin=origin;closePlace();resetInputs();arcadeOpen=true;$('arcade-overlay').hidden=false;$('arcade-panel').textContent='Loading games…';try{const {createArcade}=await import('./arcade.js');if(arcadeOpen&&session===arcadeSession){createArcade($('arcade-panel'),closeArcade);$('arcade-panel').querySelector('button')?.focus()}}catch{if(arcadeOpen&&session===arcadeSession)$('arcade-panel').innerHTML='<p>Unable to load the arcade.</p><button class="arcade-button" id="arcade-error-close">CLOSE</button>';const button=$('arcade-error-close');if(button)button.onclick=closeArcade}}
 function closeArcade(){arcadeSession++;arcadeOpen=false;$('arcade-overlay').hidden=true;if(arcadeOrigin==='menu')openGameMenu();else openPlace(interiorPlace)}
-function openCasino(){closePlace();resetInputs();casinoOpen=true;$('arcade-overlay').hidden=false;createCasino($('arcade-panel'),progress,refreshCash,closeCasino);$('arcade-panel').querySelector('button')?.focus()}
-function closeCasino(){casinoOpen=false;$('arcade-overlay').hidden=true;openPlace(interiorPlace)}
+function openCasino(){closePlace();resetInputs();casinoOpen=true;$('arcade-overlay').hidden=false;casinoHandle?.destroy?.();casinoHandle=createCasino($('arcade-panel'),progress,refreshCash,closeCasino,sound);$('arcade-panel').querySelector('button')?.focus()}
+function closeCasino(){casinoHandle?.destroy?.();casinoHandle=null;casinoOpen=false;$('arcade-overlay').hidden=true;openPlace(interiorPlace)}
 function speakDialogue(playerLine,npcLine){if(!voiceLines||muted||!('speechSynthesis' in window)||!('SpeechSynthesisUtterance' in window))return;try{window.speechSynthesis.cancel();for(const [text,pitch] of [[playerLine,.9],[npcLine,1.1]]){const u=new SpeechSynthesisUtterance(text);u.pitch=pitch;u.volume=sfxVolume;window.speechSynthesis.speak(u)}}catch{}}
 function nearestPerson(){if(!started||insideHome||vehicle)return null;let nearest=null,best=6.5;for(const c of civilians){if(!c.mesh.visible)continue;const d=Math.hypot(c.x-player.position.x,c.z-player.position.z);if(d<best){best=d;nearest=c}}return nearest}
 // Named strangers: every person on the street keeps a stable name, so talking to
@@ -1150,7 +1171,17 @@ function animate(){requestAnimationFrame(animate);const elapsed=clock.getDelta()
    animateWalk(player,Math.min(actualSpeed/speed,1),walkCycle,dt,fireHeld,aiming,sprinting,actualSpeed);if(actualSpeed>.5&&gameTime-lastStepSound>(sprinting?.25:.42)){sound('step');lastStepSound=gameTime}
   }
   updateSideMissionRun(dt);
-  if(insideHome)for(const person of interiorCrowd(interiorPlace.id)){if(!person.mesh.visible)continue;person.walk+=dt;person.animElapsed+=dt;if(person.animElapsed>=.12){animateWalk(person.mesh,0,person.walk,person.animElapsed);person.animElapsed=0}applyTalkGesture(person.mesh,gameTime+person.talkPhase,.6)}if(player.userData.model?.userData.gun)player.userData.model.userData.gun.visible=!insideHome;if(aiming&&!vehicle)player.rotation.y=cameraYaw;if(fireHeld&&!insideHome)shoot();if(reloadEnd&&gameTime>=reloadEnd){ammo[weaponIndex]=weapons[weaponIndex].cap;reloadEnd=0}if(!insideHome)updateEnemies(dt);if(!ended&&!insideHome&&missionActive){if(activity)updateSideActivity(Math.min(elapsed,.25));else updateMission();}if(!ended&&!insideHome)updateNavigation();if(!ended&&!insideHome)updateRival(dt);if(!ended){const cityPos=vehicle?vehicle.mesh.position:player.position;updateCity(dt,cityPos);updateAnimals(dt,cityPos);if(!insideHome)updatePolice(dt,cityPos);}if(!ended&&!insideHome&&missionActive&&!activity&&mission===2&&gameTime-lastReinforcement>16&&enemies.filter(e=>e.alive&&e.kind==='pursuer').length<5){const p=vehicle?vehicle.mesh.position:player.position;const z=Math.round(p.z/28)*28;const x=Math.max(-84,Math.min(84,Math.round(p.x/28)*28+(p.x<target.x?-28:28)));spawnEnemy(x,z,'pursuer');lastReinforcement=gameTime;showToast('ENEMY REINFORCEMENTS INBOUND')}
+  if(!ended)for(const [id,life] of Object.entries(interiorLife)){for(const event of stepInteriorLife(life,interiorSpots[id]||[],dt,{time:gameTime,random:cityRandom})){if(event.type==='talk')lifeStats.talks++;else if(event.type==='exit')lifeStats.exits++;else if(event.type==='enter')lifeStats.enters++;doorEvent(id,event)}}
+  if(insideHome)for(const person of interiorCrowd(interiorPlace.id)){
+    const agent=person.agent;if(!agent)continue;
+    person.x=agent.x;person.z=agent.z;person.ry=agent.ry;
+    person.mesh.position.set(agent.x,0,agent.z);person.mesh.rotation.y=agent.ry;
+    person.mesh.visible=agent.mode!=='out';
+    if(person.mesh.visible&&!person.requested){person.requested=true;models.person(person.mesh,person.role)}
+    person.walk+=dt;person.animElapsed+=dt;
+    if(person.animElapsed>=.12){animateWalk(person.mesh,agent.mode==='walk'?.55:0,person.walk,person.animElapsed);person.animElapsed=0}
+    if(agent.mode==='talk')applyTalkGesture(person.mesh,gameTime+person.talkPhase,.8);
+  }if(player.userData.model?.userData.gun)player.userData.model.userData.gun.visible=!insideHome;if(aiming&&!vehicle)player.rotation.y=cameraYaw;if(fireHeld&&!insideHome)shoot();if(reloadEnd&&gameTime>=reloadEnd){ammo[weaponIndex]=weapons[weaponIndex].cap;reloadEnd=0}if(!insideHome)updateEnemies(dt);if(!ended&&!insideHome&&missionActive){if(activity)updateSideActivity(Math.min(elapsed,.25));else updateMission();}if(!ended&&!insideHome)updateNavigation();if(!ended&&!insideHome)updateRival(dt);if(!ended){const cityPos=vehicle?vehicle.mesh.position:player.position;updateCity(dt,cityPos);updateAnimals(dt,cityPos);if(!insideHome)updatePolice(dt,cityPos);}if(!ended&&!insideHome&&missionActive&&!activity&&mission===2&&gameTime-lastReinforcement>16&&enemies.filter(e=>e.alive&&e.kind==='pursuer').length<5){const p=vehicle?vehicle.mesh.position:player.position;const z=Math.round(p.z/28)*28;const x=Math.max(-84,Math.min(84,Math.round(p.x/28)*28+(p.x<target.x?-28:28)));spawnEnemy(x,z,'pursuer');lastReinforcement=gameTime;showToast('ENEMY REINFORCEMENTS INBOUND')}
   for(let i=shots.length-1;i>=0;i--)if(shots[i].until<gameTime){scene.remove(shots[i].line);shots[i].line.geometry.dispose();shots[i].line.material.dispose();shots.splice(i,1)}
   $('hud').classList.toggle('driving',!!vehicle);$('hud').classList.toggle('at-home',insideHome);$('health').textContent=Math.ceil(health);$('health-fill').style.width=Math.max(0,Math.min(100,health))+'%';$('health-fill').style.background=health<30?'#ff6b59':'#c9fc51';$('weapon').textContent=vehicle?`${vehicle.brand||'VEHICLE'} ${vehicle.model||''}`.trim():weapons[weaponIndex].name;$('weapon-sub').textContent=vehicle?`${Math.round(Math.abs(vehicleSpeed)*5)} KM/H · TAP RADIO`:reloadEnd?'RELOADING...':aimAssist?'AIM ASSIST ON':'MANUAL AIM';$('ammo').innerHTML=vehicle?'—':`${ammo[weaponIndex]} <small>/ ∞</small>`;const reloading=!!reloadEnd&&!vehicle;$('reload-track').classList.toggle('visible',reloading);const reloadProgress=reloading?Math.round(Math.max(0,Math.min(1,1-(reloadEnd-gameTime)))*100):0;$('reload-fill').style.width=reloadProgress+'%';$('reload-track').setAttribute('aria-valuenow',String(reloadProgress));$('reload-btn').classList.toggle('selected',reloading);
   const place=insideHome?interiorPlace:nearestPlace(),trafficNear=!insideHome&&!vehicle&&!place?nearestTrafficCar():null,parkedDistance=vehicles.reduce((best,v)=>Math.min(best,player.position.distanceTo(v.mesh.position)),5),hijack=trafficNear&&player.position.distanceTo(trafficNear.car.mesh.position)<parkedDistance;const near=insideHome||vehicle||place||parkedDistance<5||trafficNear;$('interact-btn').style.display=near?'':'none';$('interact-btn').querySelector('.lbl').textContent=vehicle?'EXIT':place?'USE':hijack?'TAKE':'RIDE';$('interact-btn').setAttribute('aria-label',vehicle?'Exit vehicle':place?`Use ${place.name}`:hijack?'Pull driver out and take car':'Enter nearby vehicle');$('interaction').style.display=place&&!vehicle?'block':'none';$('interaction').textContent=insideHome?`${interiorPlace.name} · TAP USE FOR OPTIONS OR EXIT`:place?`${place.name} · TAP USE`:'';$('navigation').style.display=insideHome?'none':'';$('talk-btn').style.display=nearestPerson()&&!place?'':'none';
@@ -1180,6 +1211,9 @@ if(import.meta.env.DEV) window.__aivmTest={
   warp(x,z){const p=vehicle?vehicle.mesh.position:player.position;p.set(x,0,z);if(vehicle)player.position.copy(p);vehicleSpeed=0},
   state(){const pos=vehicle?vehicle.mesh.position:player.position;return {mission,phase,kills,health,insideHome,missionActive,selectedDistrict:selectedDistrict.id,activity:activity?{id:activity.id,step:activity.step,remaining:activity.remaining}:null,gameMenuOpen,casinoOpen,interior:insideHome?interiorPlace.id:null,money:progress.money,owned:[...progress.owned],placeOpen,settingsOpen,vehicle:vehicle?.type||null,weapon:weapons[weaponIndex].name,ammo:ammo[weaponIndex],ammoAll:[...ammo],reloading:!!reloadEnd,gasHeld,brakeHeld,weaponMenuOpen,mapOpen,dropKills,rival:rival?{x:rival.car.mesh.position.x,z:rival.car.mesh.position.z}:null,ended,x:pos.x,z:pos.z,cameraYaw,lookPitch,aiming,fireHeld,assist:aimAssist}},
   people(){return civilians.map(c=>({id:c.id,x:c.mesh.position.x,z:c.mesh.position.z,ry:c.ry,mode:c.mode,district:c.district,line:c.line,visible:c.mesh.visible,model:!!c.mesh.userData.model}))},
+  interiorState(){const id=interiorPlace.id;return {id,time:+gameTime.toFixed(1),agents:(interiorLife[id]||[]).map(a=>({mode:a.mode,x:+a.x.toFixed(2),z:+a.z.toFixed(2),ry:+a.ry.toFixed(2),wait:+a.wait.toFixed(2),think:+a.think.toFixed(1),partner:a.partner}))}},
+  doorTraffic(){return civilians.filter(c=>c.doorful).length},
+  lifeStats(){return {...lifeStats}},
   trafficStatus(){return traffic.map(t=>({type:t.car.type,x:t.car.mesh.position.x,z:t.car.mesh.position.z}))},
   health(value){health=value},
   yaw(value){cameraYaw=value;player.rotation.y=value;camera.position.set(player.position.x+Math.sin(value)*6.7,3.35,player.position.z+Math.cos(value)*6.7)},
