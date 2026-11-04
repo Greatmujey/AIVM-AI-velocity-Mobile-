@@ -81,3 +81,60 @@
 .talk-button{position:absolute;left:50%;bottom:42%;transform:translateX(-50%);pointer-events:auto;background:#1d564a;border:1px solid #b6f5df;border-radius:4px;padding:10px 18px;font-size:11px;font-weight:800;touch-action:manipulation}.game-menu-overlay[hidden]{display:none}.game-menu-overlay{position:absolute;inset:0;z-index:45;display:flex;align-items:center;justify-content:center;padding:12px;background:#061310e8;pointer-events:auto;touch-action:pan-y}.game-menu-card{width:min(620px,100%);max-height:100%;overflow:auto;background:#102a23;border:1px solid #93c9b7;padding:18px;touch-action:pan-y}.game-menu-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.game-menu-grid button{min-height:52px;text-align:left;padding:10px;background:#285548;border:1px solid #86bcaa;font-weight:800;font-size:11px;touch-action:manipulation}.game-menu-grid button:disabled{opacity:.5}.game-menu-card p{color:#bcd6c7;font-size:11px}.dialog-line{white-space:pre-line}.settings-button+.settings-button{margin-top:4px}@media(max-height:420px){.game-menu-card{padding:12px}.game-menu-grid button{min-height:38px}.talk-button{bottom:47%}}
 .ludo-wrap{display:flex;align-items:center;gap:12px}.ludo-track{flex:none;display:grid;grid-template-columns:repeat(14,1fr);grid-template-rows:repeat(14,1fr);width:min(250px,55vw);aspect-ratio:1;gap:1px;background:#56756a}.ludo-cell{font-size:clamp(8px,1.5vw,12px);aspect-ratio:auto}.ludo-center{grid-area:2/2/14/14;display:grid;grid-template-columns:1fr 1fr;align-items:start;background:conic-gradient(#e7c46c 0 25%,#abd5b3 25% 50%,#e9c1b2 50% 75%,#a6c8df 75%);color:#17352b;border:4px solid #e6ece0;font-size:10px;font-weight:900;text-align:center}.ludo-center span{padding:8px 3px}.ludo-center b{grid-column:1/3;align-self:center;font-size:19px;letter-spacing:.1em}.ludo-label{max-width:180px}@media(max-width:500px){.ludo-track{width:min(250px,65vw)}}@media(max-height:500px){.ludo-track{width:min(210px,52vw)}}
 @media(max-width:500px){.ludo-wrap{flex-wrap:wrap}.ludo-label{max-width:none;width:100%;margin:0}}
+
+/* Race room, live race HUD and mission list */
+.race-overlay{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:14px;background:#0a1112d9;backdrop-filter:blur(6px)}
+.race-overlay[hidden]{display:none}
+.race-panel{width:min(620px,100%);max-height:92vh;overflow-y:auto;background:#12211f;border:1px solid #3c524b;border-radius:18px;padding:16px;color:#e9f2e6;box-shadow:0 24px 60px #0009}
+.race-ui{display:flex;flex-direction:column;gap:9px}
+.race-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.race-head small,.race-label{font:600 10px/1.4 ui-monospace,monospace;letter-spacing:.16em;color:#9fb7a6}
+.race-head h2{margin:2px 0 0;font-size:22px;letter-spacing:.04em;color:#f2f7ea}
+.race-note{margin:0;color:#a9c0b4;font-size:13px;line-height:1.45}
+.race-small{font-size:11px;color:#87a196}
+.race-tracks{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+.race-track,.race-action{padding:10px 12px;border-radius:11px;border:1px solid #4a6459;background:#1b2e2a;color:#e6f1e2;font:600 12px/1.3 ui-monospace,monospace;letter-spacing:.06em;text-align:left;cursor:pointer}
+.race-track.selected{border-color:#c9fc51;background:#2d4433;color:#eaffc0}
+.race-actions{display:grid;gap:8px;grid-template-columns:1fr 1fr}
+.race-action{display:flex;flex-direction:column;gap:2px;min-height:46px;justify-content:center}
+.race-action small{font-weight:400;font-size:10px;color:#9db3a7;letter-spacing:.02em}
+.primary-race{background:#c9fc51;border-color:#c9fc51;color:#16220f}
+.primary-race small{color:#3c4a24}
+.race-join{display:flex;gap:8px;align-items:stretch}
+.race-input{flex:0 0 96px;padding:8px;border-radius:11px;border:1px solid #4a6459;background:#0e1917;color:#eaffc0;font:700 18px/1 ui-monospace,monospace;letter-spacing:.22em;text-align:center;text-transform:uppercase}
+.race-join .race-action{flex:1}
+.race-status{margin:0;color:#c9fc51;font:600 12px ui-monospace,monospace;letter-spacing:.1em}
+.race-code{margin:0;font:800 34px/1 ui-monospace,monospace;letter-spacing:.28em;color:#f4ffd6;background:#0c1614;border:1px dashed #71917f;border-radius:12px;padding:10px 14px;text-align:center}
+.race-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.race-player{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:9px;background:#182926;font-size:13px}
+.race-player.you{outline:1px solid #c9fc5155}
+.race-player-state{color:#a8c3b4;margin-left:auto;font:600 11px ui-monospace,monospace;letter-spacing:.06em}
+.race-count{font:800 64px/1 ui-monospace,monospace;color:#c9fc51;text-align:center;padding:18px 0}
+.race-countdown{align-items:center;text-align:center}
+.race-hud{position:fixed;top:64px;right:10px;z-index:35;width:158px;padding:8px 10px;border-radius:12px;background:#0d1a18cc;border:1px solid #44604f;color:#eaf4e6;pointer-events:none}
+.race-hud[hidden]{display:none}
+.race-hud-top{display:flex;justify-content:space-between;font:600 10px ui-monospace,monospace;color:#9fb7a6;letter-spacing:.06em}
+.race-hud-top strong{color:#dff5d0}
+.race-hud ol{list-style:none;margin:6px 0 0;padding:0;font:600 11px ui-monospace,monospace;display:flex;flex-direction:column;gap:2px}
+.race-hud ol li{color:#c7dccd}
+.race-hud ol li.you{color:#d9ff8f}
+.race-hud-next{margin-top:6px;font:600 10px ui-monospace,monospace;letter-spacing:.1em;color:#c9fc51}
+@media (max-width:520px){.race-actions{grid-template-columns:1fr}.race-hud{top:auto;bottom:150px;right:6px;width:132px}.race-code{font-size:26px;letter-spacing:.2em}}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+.race-name-row{display:flex;align-items:center;gap:8px}
+.race-name-row .race-label{flex:0 0 auto}
+.race-name-row .race-input{flex:1;min-width:0}
+.race-name{font-size:15px;letter-spacing:.08em;text-align:left;padding:8px 10px}
+@media (max-width:430px){
+ .race-panel{padding:13px}
+ .race-head h2{font-size:19px}
+ .race-note{font-size:12px}
+ .race-action{font-size:11px;min-height:44px;padding:8px 10px}
+ .race-action small{font-size:9px}
+ .race-join{flex-direction:column}
+ .race-input{flex:none;height:52px;width:100%;font-size:17px}
+ .race-code{font-size:24px;letter-spacing:.18em}
+ .race-tracks{grid-template-columns:1fr 1fr}
+ .race-track{padding:8px 9px;font-size:11px}
+}

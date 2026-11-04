@@ -15,9 +15,10 @@ All assets below are included locally; they are not taken from GTA or Call of Du
 - **Playable character** (`public/assets/models/player-marcus.glb`): Marcus, smart-casual outfit from [Rohit Biradar's Avatar Studio, commit 0369f6b](https://github.com/memoriesrohit/avatar-studio/tree/0369f6bbf8e4e636a77d40eaf6dd8834413b83cc), generated with MakeHuman/MPFB. The source README credits the bodies, skins, hair and clothing to MakeHuman under CC0; the original model contains the `Idle` and `Walk` clips authored by the project (whose code is MIT). Material handling is adapted from Avatar Studio's MIT-licensed `js/scene.js`; its license is included at `public/assets/licenses/avatar-studio.txt`. Combat and sprint use the existing credited Quaternius clips; the player walk combines Marcus’s upright torso with the Quaternius walking leg and foot motion, adjusted for his rig. This is an original model, not a GTA or CODM character.
 - **City vehicles** (`suv-luxury.glb`, `taxi.glb`, `hatchback-sports.glb`): Kenney Car Kit, CC0 1.0, same source and license as the sports sedan above.
 - **Main menu artwork** (`main-menu.jpg`): original AI-generated illustration created for AIVM; illustrative art, not in-game graphics.
-- **Music**: two original synthesized loops generated in the browser by AIVM.
+- **Music**: five original synthesized loops generated in the browser by AIVM; no external recordings.
 
 - **District foliage** (`public/assets/models/nature/`): Kenney Nature Kit, CC0 1.0. Source: [Kenney Nature Kit](https://kenney.nl/assets/nature-kit); GLB mirror: [Hidencod/tge-assets](https://github.com/Hidencod/tge-assets/tree/7be9b573bc74f32ed766b44b3f46550d02ca83b5/packs/nature-kit).
 - **District selector previews** (`public/assets/districts/`): screenshots captured from AIVM itself.
 
+- **Online race transport**: [PeerJS](https://github.com/peers/peerjs) by Michelle Bu and Eric Zhang, MIT; included license: `public/assets/licenses/peerjs.txt`. It uses the free public PeerJS signalling service and public STUN servers to open a direct WebRTC data channel between phones; no AIVM server is involved.
 - **Chess rules engine**: [chess.js](https://github.com/jhlywa/chess.js) by Jeff Hlywa, BSD 2-Clause; included license: `public/assets/licenses/chess-js.txt`.

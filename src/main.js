@@ -14,6 +14,10 @@ import { moveInside } from './interior-collision.js';
 import { createCasino } from './casino-ui.js';
 import { advanceVehicleSpeed } from './driving.js';
 import { startActivity, advanceActivity } from './activities.js';
+import { RACE_TRACKS, trackById, createRoom, joinRoom, leaveRoom, addBot, startRoom, updateRoomClock, updateRacerPosition, markFinished, standings, startGrid, formatRaceTime, snapshot, decodeMessage, staticRoomCode, MAX_RACERS, COUNTDOWN_MS } from './race.js';
+import { advanceBot, botCheckpointReached } from './race-ai.js';
+import { SIDE_MISSIONS, SIDE_MISSION_IDS, createSideMission, sideMissionTarget, sideMissionObjective, sideMissionCounter, advanceSideMission, advanceChase, chaseCaught } from './missions.js';
+import { createRaceUI } from './race-ui.js';
 import { loadProgress, saveProgress, purchase, reward, PRICES } from './economy.js';
 import { CONTROL_IDS, loadLayout, saveLayout, applyLayout } from './control-layout.js';
 import { createMusic } from './music.js';
@@ -40,7 +44,9 @@ document.querySelector('#app').innerHTML = `
 <div class="district-overlay" id="district-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="district-title"><section class="district-panel"><div class="district-head"><div><small>ONE CONNECTED CITY · FIVE DISTRICTS</small><h2 id="district-title">CHOOSE YOUR ENVIRONMENT</h2><p id="district-help">Swipe to explore. These are views from the game, not separate maps.</p></div><button id="district-close" class="dialog-close" aria-label="Close environment selection">✕</button></div><div class="district-scroll" id="district-scroll" aria-label="Available districts"></div><div class="district-footer"><span id="district-caption">Selected: Palm Grove</span><button id="district-travel" hidden>TRAVEL NOW ↗</button><button id="district-confirm">CONFIRM DISTRICT ↗</button></div></section></div>
 <div class="game-menu-overlay" id="game-menu-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="game-menu-title"><section class="game-menu-card"><div class="dialog-head"><div><small>EXPLORE AIVM</small><h2 id="game-menu-title">GAME MENU</h2></div><button id="game-menu-close" class="dialog-close" aria-label="Close game menu">✕</button></div><p id="game-menu-note"></p><div id="game-menu-grid" class="game-menu-grid"></div></section></div>
 <div class="arcade-overlay" id="arcade-overlay" hidden role="dialog" aria-modal="true" aria-label="Arcade"><section class="arcade-panel" id="arcade-panel"></section></div>
-<div class="settings-modal" id="settings-panel" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title"><div class="settings-card"><div class="dialog-head"><div><small>MAKE AIVM YOURS</small><h2 id="settings-title">SETTINGS</h2></div><button id="close-settings" class="dialog-close" aria-label="Close settings">✕</button></div><div class="settings-grid"><button id="sound-toggle" class="setting-toggle" aria-label="Toggle sound" aria-pressed="true">SOUND ON</button><button id="assist-toggle" class="setting-toggle" aria-label="Toggle aim assist" aria-pressed="true">ASSIST ON</button><label>LOOK SENSITIVITY <input id="sensitivity" type="range" min="1" max="10" value="5"></label><label>AIM SENSITIVITY <input id="aim-sensitivity" type="range" min="1" max="10" value="5"></label><label>STEERING SENSITIVITY <input id="steer-sensitivity" type="range" min="1" max="10" value="5"></label><button id="invert-look" class="setting-toggle" aria-pressed="false">INVERT LOOK OFF</button><button id="high-contrast" class="setting-toggle" aria-pressed="false">HIGH CONTRAST OFF</button><button id="voice-toggle" class="setting-toggle" aria-pressed="false">DIALOGUE VOICE OFF</button><label>SOUND EFFECTS <input id="sfx-volume" type="range" min="0" max="100"></label><label>MUSIC VOLUME <input id="music-volume" type="range" min="0" max="100"></label><label>GRAPHICS <select id="graphics-quality"><option value="balanced">BALANCED</option><option value="performance">PERFORMANCE</option></select></label><label>MUSIC <select id="music-track"><option value="off">OFF</option><option value="coast">COAST DRIVE</option><option value="night">NIGHT CRUISE</option></select></label></div><button class="menu-button edit-control" id="settings-districts">CHANGE ENVIRONMENT <span>↗</span></button><button class="menu-button edit-control" id="edit-controls">CUSTOMISE CONTROLS <span>↗</span></button><p class="settings-note">Sound, music and layouts are saved on this device. Gameplay pauses while settings are open.</p></div></div>
+<div class="race-overlay" id="race-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="race-title"><section class="race-panel"><h2 id="race-title" class="sr-only">Race room</h2><div id="race-panel"></div></section></div>
+<div class="race-hud" id="race-hud" hidden><div class="race-hud-top"><strong id="race-hud-track">CITY CIRCUIT</strong><span id="race-hud-timer">0:00</span></div><ol id="race-hud-list"></ol><div class="race-hud-next" id="race-hud-next">CP 1 / 5</div></div>
+<div class="settings-modal" id="settings-panel" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title"><div class="settings-card"><div class="dialog-head"><div><small>MAKE AIVM YOURS</small><h2 id="settings-title">SETTINGS</h2></div><button id="close-settings" class="dialog-close" aria-label="Close settings">✕</button></div><div class="settings-grid"><button id="sound-toggle" class="setting-toggle" aria-label="Toggle sound" aria-pressed="true">SOUND ON</button><button id="assist-toggle" class="setting-toggle" aria-label="Toggle aim assist" aria-pressed="true">ASSIST ON</button><label>LOOK SENSITIVITY <input id="sensitivity" type="range" min="1" max="10" value="5"></label><label>AIM SENSITIVITY <input id="aim-sensitivity" type="range" min="1" max="10" value="5"></label><label>STEERING SENSITIVITY <input id="steer-sensitivity" type="range" min="1" max="10" value="5"></label><button id="invert-look" class="setting-toggle" aria-pressed="false">INVERT LOOK OFF</button><button id="high-contrast" class="setting-toggle" aria-pressed="false">HIGH CONTRAST OFF</button><button id="voice-toggle" class="setting-toggle" aria-pressed="false">DIALOGUE VOICE OFF</button><label>SOUND EFFECTS <input id="sfx-volume" type="range" min="0" max="100"></label><label>MUSIC VOLUME <input id="music-volume" type="range" min="0" max="100"></label><label>GRAPHICS <select id="graphics-quality"><option value="balanced">BALANCED</option><option value="performance">PERFORMANCE</option></select></label><label>MUSIC <select id="music-track"><option value="off">OFF</option><option value="coast">COAST DRIVE</option><option value="night">NIGHT CRUISE</option><option value="harbor">HARBOR LIGHTS</option><option value="race">RACE FUEL</option><option value="missions">MISSION WIRE</option></select></label></div><button class="menu-button edit-control" id="settings-districts">CHANGE ENVIRONMENT <span>↗</span></button><button class="menu-button edit-control" id="edit-controls">CUSTOMISE CONTROLS <span>↗</span></button><p class="settings-note">Sound, music and layouts are saved on this device. Gameplay pauses while settings are open.</p></div></div>
 <div class="layout-editor" id="layout-editor" hidden><div class="editor-bar"><div><strong>CONTROL LAYOUT</strong><small>Drag buttons into position · This screen orientation</small></div><div><button id="layout-reset">RESET</button><button id="layout-save">SAVE</button></div></div><div class="editor-modes"><button id="edit-foot" class="active">ON FOOT</button><button id="edit-driving">DRIVING</button></div><div id="layout-items"></div></div>
 <div class="place-overlay" id="place-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="place-title"><div class="place-card"><div class="dialog-head"><div><small>PALM GROVE · CITY LIFE</small><h2 id="place-title"></h2></div><button id="place-close" class="dialog-close" aria-label="Close location">✕</button></div><p id="place-desc"></p><div id="place-actions" class="place-actions"></div></div></div>
 <div class="screen hidden" id="end"><div class="panel"><div class="panel-kicker" id="end-kicker">MISSION REPORT</div><h1 id="end-title">RUN <span>COMPLETE.</span></h1><div class="lead" id="end-text"></div><div class="feature-row"><span>THANKS FOR PLAYING</span><span>PROTOTYPE BUILD</span></div><button class="primary" id="retry">RETRY MISSION &nbsp; ↗</button><button class="secondary" id="return-city" hidden>RETURN TO CITY</button><button class="secondary" id="restart">START OVER</button></div></div>`;
@@ -96,8 +102,8 @@ const diamond=new THREE.Mesh(new THREE.OctahedronGeometry(.8),lime);diamond.posi
 const weapons=[{name:'PISTOL',cap:12,rate:.32,damage:34,range:28},{name:'ASSAULT RIFLE',cap:30,rate:.12,damage:18,range:34},{name:'SHOTGUN',cap:6,rate:.7,damage:68,range:19},{name:'SMG',cap:36,rate:.09,damage:14,range:26,unlock:'smg'},{name:'MARKSMAN',cap:8,rate:.8,damage:85,range:55,unlock:'sniper'},{name:'REVOLVER',cap:6,rate:.55,damage:60,range:31,unlock:'revolver'},{name:'BATTLE RIFLE',cap:20,rate:.18,damage:29,range:42,unlock:'battle'}];
 const ammo=weapons.map(w=>w.cap),enemies=[],shots=[],keys={};
 let storage=null;try{storage=window.localStorage}catch{}const preferences=loadPreferences(storage), progress=loadProgress(storage); let controlLayout=loadLayout(storage);
-let mapOpen=false, settingsOpen=false, placeOpen=false, editingLayout=false, districtOpen=false, arcadeOpen=false, gameMenuOpen=false, activity=null, selectedDistrict=DISTRICTS[0], insideHome=true, interiorPlace=LANDMARKS[0], missionActive=false, rival=null, dropKills=0; let music=null, sfxVolume=preferences.sfxVolume,musicVolume=preferences.musicVolume,musicTrack=preferences.musicTrack,graphicsQuality=preferences.graphicsQuality; const rewardsPaid=new Set();
-let vehicle=null, vehicleSpeed=0, health=100, mission=0, phase=0, kills=0, heat=0, started=false, ended=false, fireHeld=false, sprintHeld=false, aiming=false, aimAssist=preferences.aimAssist, lookSensitivity=preferences.lookSensitivity, aimSensitivity=preferences.aimSensitivity, steerSensitivity=preferences.steerSensitivity, invertLook=preferences.invertLook, highContrast=preferences.highContrast, voiceLines=preferences.voiceLines;
+let mapOpen=false, settingsOpen=false, placeOpen=false, editingLayout=false, districtOpen=false, arcadeOpen=false, gameMenuOpen=false, raceOpen=false, sideMission=null, activity=null, selectedDistrict=DISTRICTS[0], insideHome=true, interiorPlace=LANDMARKS[0], missionActive=false, rival=null, dropKills=0; let music=null, sfxVolume=preferences.sfxVolume,musicVolume=preferences.musicVolume,musicTrack=preferences.musicTrack,graphicsQuality=preferences.graphicsQuality; const rewardsPaid=new Set();
+let vehicle=null, vehicleSpeed=0, health=100, mission=0, phase=0, kills=0, heat=0, started=false, ended=false, sideMissionKills=0, fireHeld=false, sprintHeld=false, aiming=false, aimAssist=preferences.aimAssist, lookSensitivity=preferences.lookSensitivity, aimSensitivity=preferences.aimSensitivity, steerSensitivity=preferences.steerSensitivity, invertLook=preferences.invertLook, highContrast=preferences.highContrast, voiceLines=preferences.voiceLines;
 const firePointers=new Set(),inputResets=[];let keyboardFire=false,gasHeld=false,brakeHeld=false,weaponMenuOpen=false;
 let lastShot=-1,lastReinforcement=0,lastStepSound=0,lastEngineSound=0,weaponIndex=0,reloadEnd=0,toastTimer=0,gameTime=0,cameraYaw=0,lookPitch=0, joy={x:0,y:0}, audio=null, muted=preferences.muted, walkCycle=0;
 const objectives=[{x:0,z:-56},{x:56,z:-28},{x:-28,z:-28},{x:28,z:28},{x:-56,z:28}];let target=entrance(LANDMARKS.find(p=>p.id==='hub')), currentRoute=[], routeTarget=null, nextRouteUpdate=0;
@@ -140,7 +146,8 @@ function rewardMission(index,amount){if(rewardsPaid.has(index))return;rewardsPai
 function beginSecondMission(){rewardMission(0,500);mission=1;phase=0;target=objectives[2];heat=1;restoreHealth();spawnEnemy(-28,-33);spawnEnemy(-33,-28);spawnEnemy(-23,-28);spawnEnemy(-28,-23);setObjective('THE AMBUSH','Reach the stolen case. Eliminate the guards.',2,'GUARDS DOWN  0 / 4');showToast('DELIVERY COMPLETE · +$500');sound('success')}
 
 function updateMission(){
- const pos=vehicle?vehicle.mesh.position:player.position,dist=Math.hypot(pos.x-target.x,pos.z-target.z);
+ if(race)return;
+ const pos=vehicle?vehicle.mesh.position:player.position,dist=Math.hypot(pos.x-(target?.x??pos.x),pos.z-(target?.z??pos.z));
  if(mission===0&&phase===0&&dist<4.5){phase=1;target=objectives[1];heat=1;startRival();setObjective('FIRST DELIVERY','Rival car on your tail! Ride to the drop.',1,'PURSUIT ACTIVE');showToast('RIVAL IN PURSUIT  ·  GET TO THE DROP');sound('success')}
  else if(mission===0&&phase===1&&dist<5){phase=2;removeRival();dropKills=0;spawnEnemy(56,-42,'drop-guard');spawnEnemy(42,-28,'drop-guard');spawnEnemy(70,-28,'drop-guard');setObjective('DROP ZONE','Exit your ride and clear the attackers.',1,'ATTACKERS DOWN  0 / 3');showToast('AMBUSH AT THE DROP  ·  CLEAR THE AREA');sound('success')}
  else if(mission===0&&phase===2&&dropKills>=3){beginSecondMission()}
@@ -153,6 +160,7 @@ function beginSideActivity(id){if(missionActive)return;activity=startActivity(id
 function finishSideActivity(success){const a=activity;if(!a)return;activity=null;missionActive=false;target=entrance(LANDMARKS.find(p=>p.id==='hub'));routeTarget=null;if(success){reward(progress,a.reward);refreshCash();sound('success')}setObjective('FREE ROAM','Visit the mission hub for more jobs.',1);showToast(success?`${a.title} COMPLETE · +$${a.reward}`:`${a.title} ENDED`)}
 function updateSideActivity(dt){if(!activity)return;const a=activity,pos=vehicle?vehicle.mesh.position:player.position,result=advanceActivity(a,pos,vehicle?.type||null,dt);if(result==='expired'){finishSideActivity(false);return}if(result==='complete'){finishSideActivity(true);return}if(result==='checkpoint'){target=a.points[a.step];routeTarget=null;showToast('CHECKPOINT REACHED')}if(activity)$('mission-count').textContent=`CHECKPOINT ${a.step+1} / ${a.points.length}${a.seconds?` · ${Math.ceil(a.remaining)}s` : ''}${a.vehicle?` · ${a.vehicle.toUpperCase()} REQUIRED`:''}`}
 function updateNavigation(){
+ if(race)return;
  const pos=vehicle?vehicle.mesh.position:player.position;
  marker.position.set(target.x,0,target.z);$('heat').textContent='★'.repeat(heat)+'☆'.repeat(3-heat);
  if(routeTarget!==target||gameTime>=nextRouteUpdate){currentRoute=roadRoute(pos,target);routeTarget=target;nextRouteUpdate=gameTime+.6}
@@ -173,13 +181,14 @@ function retryMission(){
  else {target=objectives[4];heat=2;spawnEnemy(25,20,'pursuer');spawnEnemy(31,20,'pursuer');spawnEnemy(28,37,'pursuer');lastReinforcement=gameTime;setObjective('HOT RUN','Get to the safe house. Expect resistance.',3)}
  routeTarget=null;currentRoute=roadRoute(player.position,target);marker.position.set(target.x,0,target.z);camera.position.set(start.x,5.2,start.z+8);$('end').classList.add('hidden');ended=false;showToast('MISSION RESTARTED  ·  FULL HEALTH & AMMO');updateMap();
 }
-function setWeaponMenu(open){weaponMenuOpen=!!open&&!vehicle&&started&&!ended;const menu=$('weapon-menu');menu.hidden=!weaponMenuOpen;$('weapon-btn').setAttribute('aria-expanded',String(weaponMenuOpen));if(weaponMenuOpen)renderWeaponMenu()}
+function setWeaponMenu(open){weaponMenuOpen=!!open&&!vehicle&&started&&!ended&&!race;const menu=$('weapon-menu');menu.hidden=!weaponMenuOpen;$('weapon-btn').setAttribute('aria-expanded',String(weaponMenuOpen));if(weaponMenuOpen)renderWeaponMenu()}
 function renderWeaponMenu(){const menu=$('weapon-menu');menu.innerHTML='';weapons.forEach((w,i)=>{const button=document.createElement('button');const locked=w.unlock&&!progress.owned.includes(w.unlock);button.className='weapon-option'+(i===weaponIndex?' selected':'');button.setAttribute('aria-label',`${w.name}, ${ammo[i]} rounds${i===weaponIndex?', equipped':''}`);button.innerHTML=`<span>${w.name}</span><small>${locked?'LOCKED':`${ammo[i]} / ${w.cap}`}</small>`;button.addEventListener('click',()=>equipWeapon(i));menu.appendChild(button)})}
 function equipWeapon(index){if(!started||ended||vehicle||index<0||index>=weapons.length)return;if(weapons[index].unlock&&!progress.owned.includes(weapons[index].unlock)){showToast('BUY THIS WEAPON AT THE SHOP OR MISSION HUB');return}setWeaponMenu(false);if(index===weaponIndex)return;weaponIndex=index;updateWeapon(player,weaponIndex);reloadEnd=0;showToast(weapons[weaponIndex].name+' EQUIPPED')}
 function switchWeapon(){let next=(weaponIndex+1)%weapons.length;while(weapons[next].unlock&&!progress.owned.includes(weapons[next].unlock))next=(next+1)%weapons.length;equipWeapon(next)}
 function reload(){if(!started||ended||vehicle||reloadEnd||ammo[weaponIndex]===weapons[weaponIndex].cap)return;reloadEnd=gameTime+1;sound('reload');showToast('RELOADING')}
 function interact(){
- if(!started||ended||mapOpen||settingsOpen||placeOpen||editingLayout||arcadeOpen||gameMenuOpen)return;
+ if(!started||ended||mapOpen||settingsOpen||placeOpen||editingLayout||arcadeOpen||gameMenuOpen||raceOpen)return;
+ if(race){showToast('FINISH THE RACE FIRST');return}
  if(insideHome){openPlace(interiorPlace);return}
  if(vehicle){const p=vehicle.mesh.position;const candidates=[[3,0],[-3,0],[0,3],[0,-3]];const exit=candidates.find(([x,z])=>!world.blocks.some(b=>Math.abs(p.x+x-b.x)<b.halfX&&Math.abs(p.z+z-b.z)<b.halfZ));if(!exit){showToast('NO ROOM TO EXIT HERE');return}resetInputs();player.position.set(p.x+exit[0],0,p.z+exit[1]);player.visible=true;vehicle.occupied=false;if(vehicle.rider)vehicle.rider.visible=false;vehicle=null;vehicleSpeed=0;showToast('ON FOOT');return}
  const place=nearestPlace();if(place){enterPlace(place);return}
@@ -213,7 +222,8 @@ function openPlace(place){
   if(place.id==='hub'&&!missionActive)placeButton('START FIRST DELIVERY · REWARD $500',()=>{closePlace();missionActive=true;target=objectives[0];routeTarget=null;marker.position.set(target.x,0,target.z);setObjective('FIRST DELIVERY','Take the bike and pick up the package.',1);showToast('JOB ACCEPTED · FOLLOW THE MARKER');sound('success')});
   else if(place.id==='hub')placeButton('CONTINUE CURRENT JOB',()=>{closePlace();showToast('FOLLOW YOUR MISSION MARKER')});
   if(interiorPeople[place.id])placeButton('TALK TO PERSON',()=>openConversation(true));
-  if(place.id==='hub'){if(!missionActive){placeButton('SIDE JOB · COASTAL COURIER · $300',()=>beginSideActivity('coast'));placeButton('SIDE JOB · PORT DISPATCH · $400',()=>beginSideActivity('port'));placeButton('CAR TIME TRIAL · $500',()=>beginSideActivity('carRace'));placeButton('BIKE TIME TRIAL · $500',()=>beginSideActivity('bikeRace'))}else if(activity)placeButton('CANCEL CURRENT JOB',()=>{closePlace();finishSideActivity(false)});placeButton('PLAY ARCADE GAMES',()=>openArcade('place'))}
+  if(place.id==='hub'&&!missionActive&&!sideMission)placeButton('STORY MISSIONS · NIGHT PATROL & MORE',()=>{closePlace();openMissions()});
+  if(place.id==='hub'){if(!missionActive&&!sideMission){placeButton('SIDE JOB · COASTAL COURIER · $300',()=>beginSideActivity('coast'));placeButton('SIDE JOB · PORT DISPATCH · $400',()=>beginSideActivity('port'));placeButton('CAR TIME TRIAL · $500',()=>beginSideActivity('carRace'));placeButton('BIKE TIME TRIAL · $500',()=>beginSideActivity('bikeRace'))}else if(activity)placeButton('CANCEL CURRENT JOB',()=>{closePlace();finishSideActivity(false)});placeButton('PLAY ARCADE GAMES',()=>openArcade('place'))}
   for(const [id,name] of [['smg','SMG'],['sniper','MARKSMAN'],['car','CAR SPEED UPGRADE'],['revolver','REVOLVER'],['battle','BATTLE RIFLE']]){
    const owned=progress.owned.includes(id);placeButton(owned?`${name} · OWNED`:`BUY ${name} · $${PRICES[id]}`,()=>{if(owned){showToast('ALREADY OWNED');return}if(!purchase(progress,id)){showToast('NOT ENOUGH CASH');return}refreshCash();sound('success');openPlace(place)});
   }
@@ -261,7 +271,8 @@ function nearestTarget(){
 function addTracer(from,to,color){const geo=new THREE.BufferGeometry().setFromPoints([from,to]);const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color}));scene.add(line);shots.push({line,until:gameTime+.09})}
 function damageEnemy(enemy,amount){
  if(!enemy.alive)return;enemy.hp-=amount;setHitFlash(enemy.mesh,true);setTimeout(()=>setHitFlash(enemy.mesh,false),100);$('hitmarker').classList.add('active');setTimeout(()=>$('hitmarker').classList.remove('active'),100);
- if(enemy.hp<=0){enemy.alive=false;scene.remove(enemy.mesh);if(mission===0&&phase===2&&enemy.kind==='drop-guard'){dropKills++;$('mission-count').textContent=`ATTACKERS DOWN  ${Math.min(dropKills,3)} / 3`}if(mission===1&&phase===0&&enemy.kind==='guard'){kills++;$('mission-count').textContent=`GUARDS DOWN  ${Math.min(kills,4)} / 4`}}
+ if(enemy.hp<=0){enemy.alive=false;scene.remove(enemy.mesh);if(mission===0&&phase===2&&enemy.kind==='drop-guard'){dropKills++;$('mission-count').textContent=`ATTACKERS DOWN  ${Math.min(dropKills,3)} / 3`}if(mission===1&&phase===0&&enemy.kind==='guard'){kills++;$('mission-count').textContent=`GUARDS DOWN  ${Math.min(kills,4)} / 4`}
+  if(enemy.kind==='mission'&&sideMission){sideMissionKills++;sideMission.cleared=sideMissionKills;$('mission-count').textContent=sideMissionCounter(sideMission)||'';const step=SIDE_MISSIONS[sideMission.id].steps[sideMission.step];if(step?.kind==='clear'&&sideMissionKills>=step.count){const state=advanceSideMission(sideMission,vehicle?vehicle.mesh.position:player.position,sideMissionKills);if(state)onSideMissionStep(state,true)}}}
 }
 function shoot(){
  const w=weapons[weaponIndex];if(!started||ended||insideHome||mapOpen||settingsOpen||placeOpen||vehicle||reloadEnd||gameTime-lastShot<w.rate)return;if(ammo[weaponIndex]<=0){reload();return}lastShot=gameTime;ammo[weaponIndex]--;sound('shot');
@@ -288,7 +299,7 @@ function updateMap(){
  ctx.save();ctx.rotate(-cameraYaw);ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(0,-9);ctx.lineTo(6,7);ctx.lineTo(0,4);ctx.lineTo(-6,7);ctx.closePath();ctx.fill();ctx.restore();ctx.restore();
 }
 function setMapOpen(open){
- if(open&&(ended||settingsOpen||placeOpen||editingLayout||districtOpen||arcadeOpen||casinoOpen||gameMenuOpen))return;
+ if(open&&(ended||settingsOpen||placeOpen||editingLayout||districtOpen||arcadeOpen||casinoOpen||gameMenuOpen||raceOpen))return;
  mapOpen=open; $('map-overlay').hidden=!open;
  if(open){resetInputs();setWeaponMenu(false);const position=insideHome?entrance(interiorPlace):vehicle?vehicle.mesh.position:player.position;currentRoute=roadRoute(position,target);drawFullMap($('full-map'),{blocks:world.blocks,position,target,route:currentRoute,enemies:rival?[...enemies,{alive:true,mesh:rival.car.mesh}]:enemies,vehicles,cameraYaw});$('close-map').focus()}
  else {(started?$('open-map'):$('menu-map')).focus()}
@@ -296,7 +307,7 @@ function setMapOpen(open){
 $('open-map').onclick=()=>setMapOpen(true);$('menu-map').onclick=()=>setMapOpen(true);$('close-map').onclick=()=>setMapOpen(false);
 $('full-map').addEventListener('click',e=>{if(!started||missionActive)return;const rect=e.currentTarget.getBoundingClientRect(),x=(e.clientX-rect.left)/rect.width*(MAP_BOUND*2)-MAP_BOUND,z=(e.clientY-rect.top)/rect.height*(MAP_BOUND*2)-MAP_BOUND;let nearest=null,distance=20;for(const place of LANDMARKS){const p=entrance(place),d=Math.hypot(x-p.x,z-p.z);if(d<distance){nearest={...p,name:place.name};distance=d}}for(const district of DISTRICTS){const d=Math.hypot(x-district.x,z-district.z);if(d<distance){nearest=district;distance=d}}if(nearest){target={x:nearest.x,z:nearest.z};routeTarget=null;setMapOpen(false);showToast(`GPS SET · ${nearest.name}`)}});
 function resize(){renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();applyLayout(controlLayout);if(editingLayout)renderLayoutEditor()}window.addEventListener('resize',resize);resize();
-window.addEventListener('keydown',e=>{if(gameMenuOpen){if(e.code==='Escape')closeGameMenu();return}if(casinoOpen){if(e.code==='Escape')closeCasino();return}if(arcadeOpen){if(e.code==='Escape'){e.preventDefault();closeArcade()}return}if(e.code==='Escape'&&mapOpen){e.preventDefault();setMapOpen(false);return}if(e.code==='KeyM'&&!e.repeat){e.preventDefault();setMapOpen(!mapOpen);return}if(settingsOpen||placeOpen||editingLayout||districtOpen){if(e.code==='Escape'){if(districtOpen)cancelDistrict();else if(editingLayout){editingLayout=false;$('layout-editor').hidden=true;applyLayout(controlLayout)}else if(placeOpen){if(conversationInside)closeConversation();else closePlace()}else setSettings(false)}return}if(mapOpen)return;if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();if(e.repeat)return;keys[e.code]=true;if(e.code==='KeyE')interact();if(e.code==='KeyT'&&nearestPerson())openConversation(false);if(e.code==='KeyQ')switchWeapon();if(e.code==='KeyR')reload();if(e.code==='KeyV')toggleAim();if(e.code==='Space'){keyboardFire=true;updateFire();if(started&&!ended&&!vehicle)shoot()}if(e.code==='Escape')setWeaponMenu(false)});
+window.addEventListener('keydown',e=>{if(raceOpen){if(e.code==='Escape'){e.preventDefault();closeRaceRoom()}return}if(gameMenuOpen){if(e.code==='Escape')closeGameMenu();return}if(casinoOpen){if(e.code==='Escape')closeCasino();return}if(arcadeOpen){if(e.code==='Escape'){e.preventDefault();closeArcade()}return}if(e.code==='Escape'&&mapOpen){e.preventDefault();setMapOpen(false);return}if(e.code==='KeyM'&&!e.repeat){e.preventDefault();setMapOpen(!mapOpen);return}if(settingsOpen||placeOpen||editingLayout||districtOpen){if(e.code==='Escape'){if(districtOpen)cancelDistrict();else if(editingLayout){editingLayout=false;$('layout-editor').hidden=true;applyLayout(controlLayout)}else if(placeOpen){if(conversationInside)closeConversation();else closePlace()}else setSettings(false)}return}if(mapOpen)return;if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();if(e.repeat)return;keys[e.code]=true;if(e.code==='KeyE')interact();if(e.code==='KeyT'&&nearestPerson())openConversation(false);if(e.code==='KeyQ')switchWeapon();if(e.code==='KeyR')reload();if(e.code==='KeyV')toggleAim();if(e.code==='Space'){keyboardFire=true;updateFire();if(started&&!ended&&!vehicle)shoot()}if(e.code==='Escape')setWeaponMenu(false)});
 window.addEventListener('keyup',e=>{keys[e.code]=false;if(e.code==='Space'){keyboardFire=false;updateFire()}});
 window.addEventListener('blur',resetInputs);document.addEventListener('visibilitychange',()=>{if(document.hidden)resetInputs()});
 let districtFromSettings=false,districtOriginal=selectedDistrict;
@@ -307,7 +318,7 @@ function travelToDistrict(){if(!started||missionActive)return;resetInputs();if(v
 function renderDistrictCards(){const list=$('district-scroll');list.replaceChildren();for(const district of DISTRICTS){const button=document.createElement('button');button.className='district-card'+(district.id===selectedDistrict.id?' selected':'');button.setAttribute('aria-pressed',String(district.id===selectedDistrict.id));button.setAttribute('aria-label',`${district.name} environment`);button.innerHTML=`<img src="${import.meta.env.BASE_URL}assets/districts/${district.id}.jpg" alt=""><span class="district-card-label"><b>${district.label}</b><small>${district.name}</small></span>`;button.onclick=()=>{selectedDistrict=district;$('district-choice').textContent=district.label;$('district-caption').textContent=`Selected: ${district.name}`;const scroll=list.scrollLeft;renderDistrictCards();list.scrollLeft=scroll;list.querySelector('.selected')?.focus({preventScroll:true})};list.appendChild(button)}}
 $('menu-districts').onclick=()=>setDistrictOpen(true);$('settings-districts').onclick=()=>setDistrictOpen(true,true);$('district-travel').onclick=()=>{const gpsOnly=districtFromSettings;setDistrictOpen(false);setSettings(false);if(gpsOnly){setDistrictGps();showToast(`GPS SET · ${selectedDistrict.name}`)}else travelToDistrict()};$('district-close').onclick=cancelDistrict;$('district-confirm').onclick=()=>{const go=districtFromSettings&&started&&!missionActive;setDistrictOpen(false);if(go){setSettings(false);travelToDistrict()}else if(!missionActive)setDistrictGps()};
 function closeGameMenu(){gameMenuOpen=false;$('game-menu-overlay').hidden=true;(started?$('game-menu-button'):$('menu-activities')).focus()}
-function openGameMenu(){if(ended||mapOpen||settingsOpen||placeOpen||districtOpen||arcadeOpen||casinoOpen)return;resetInputs();setWeaponMenu(false);gameMenuOpen=true;$('game-menu-overlay').hidden=false;$('game-menu-note').textContent=!started?'Start the game to begin races and jobs. Arcade and settings are available now.':missionActive?'A job is active; finish or cancel it before starting another.':'Choose an activity. Time trials are solo and use in-game cash rewards.';const grid=$('game-menu-grid');grid.replaceChildren();function add(label,fn,disabled=false){const b=document.createElement('button');b.textContent=label;b.disabled=disabled;b.onclick=fn;grid.appendChild(b)}for(const [label,id] of [['CAR RACING · TIME TRIAL','carRace'],['BIKE RACING · TIME TRIAL','bikeRace'],['COASTAL COURIER · JOB','coast'],['PORT DISPATCH · JOB','port']])add(label,()=>{closeGameMenu();beginSideActivity(id)},!started||missionActive);if(activity)add('CANCEL CURRENT ACTIVITY',()=>{closeGameMenu();finishSideActivity(false)});add('MINI GAMES · CHESS, LUDO & MORE',()=>{closeGameMenu();openArcade('menu')});add('SETTINGS & ENVIRONMENT',()=>{closeGameMenu();setSettings(true)});add('CITY MAP',()=>{closeGameMenu();setMapOpen(true)});$('game-menu-close').focus()}
+function openGameMenu(){if(ended||mapOpen||settingsOpen||placeOpen||districtOpen||arcadeOpen||casinoOpen||raceOpen)return;resetInputs();setWeaponMenu(false);gameMenuOpen=true;$('game-menu-overlay').hidden=false;$('game-menu-note').textContent=!started?'Start the game to begin races and jobs. Arcade and settings are available now.':missionActive?'A job is active; finish or cancel it before starting another.':'Choose an activity. Time trials are solo and use in-game cash rewards.';const grid=$('game-menu-grid');grid.replaceChildren();function add(label,fn,disabled=false){const b=document.createElement('button');b.textContent=label;b.disabled=disabled;b.onclick=fn;grid.appendChild(b)}add('RACE ROOM · 2-5 RACERS',()=>{closeGameMenu();openRaceRoom()},!started||missionActive);for(const [label,id] of [['CAR RACING · TIME TRIAL','carRace'],['BIKE RACING · TIME TRIAL','bikeRace']])add(label,()=>{closeGameMenu();beginSideActivity(id)},!started||missionActive);add('MISSIONS · NIGHT PATROL & MORE',()=>{closeGameMenu();openMissions()},!started||(missionActive&&!sideMission));for(const [label,id] of [['COASTAL COURIER · JOB','coast'],['PORT DISPATCH · JOB','port']])add(label,()=>{closeGameMenu();beginSideActivity(id)},!started||missionActive);if(sideMission)add('CANCEL CURRENT MISSION',()=>{closeGameMenu();finishSideMission(false)});if(activity)add('CANCEL CURRENT ACTIVITY',()=>{closeGameMenu();finishSideActivity(false)});add('MINI GAMES · CHESS, LUDO & MORE',()=>{closeGameMenu();openArcade('menu')});add('SETTINGS & ENVIRONMENT',()=>{closeGameMenu();setSettings(true)});add('CITY MAP',()=>{closeGameMenu();setMapOpen(true)});$('game-menu-close').focus()}
 $('game-menu-close').onclick=closeGameMenu;$('game-menu-button').onclick=openGameMenu;$('menu-activities').onclick=openGameMenu;$('talk-btn').onclick=()=>{if(nearestPerson())openConversation(false)};
 $('settings-button').onclick=()=>setSettings(!settingsOpen);$('menu-settings').onclick=()=>setSettings(true);$('close-settings').onclick=()=>setSettings(false);
 $('start').onclick=()=>{started=true;$('intro').classList.add('hidden');homeInterior.visible=true;player.position.set(HOME_CENTER.x,0,HOME_CENTER.z);camera.position.set(0,4,HOME_CENTER.z+7);marker.visible=false;setObjective('AT HOME',selectedDistrict.id==='city'?'Rest here or exit and visit the mission hub.':`Rest here or travel to ${selectedDistrict.name}.`,1);try{audio=new (window.AudioContext||window.webkitAudioContext)();audio.resume();prepareAudio();music=createMusic(audio)}catch{}showToast('YOUR HOME · TAP USE TO REST OR LEAVE')};
@@ -341,8 +352,394 @@ let lookPointer=null,lastLookX=0,lastLookY=0;
 canvas.addEventListener('pointerdown',e=>{if(e.button===2){toggleAim();return}if(!started||ended||lookPointer!==null)return;lookPointer=e.pointerId;lastLookX=e.clientX;lastLookY=e.clientY;canvas.setPointerCapture(e.pointerId)});
 canvas.addEventListener('pointermove',e=>{if(e.pointerId!==lookPointer)return;applyLook(e.clientX-lastLookX,e.clientY-lastLookY);lastLookX=e.clientX;lastLookY=e.clientY});
 function endLook(e){if(e.pointerId===lookPointer)lookPointer=null}canvas.addEventListener('pointerup',endLook);canvas.addEventListener('pointercancel',endLook);canvas.addEventListener('lostpointercapture',endLook);
+// ------------------------------------------------------------ STORY MISSIONS
+// Extra missions are short chains of reach/clear/chase steps. They use the same
+// marker, enemies and rewards as the three-mission story, but can be restarted.
+let missionChase=null;
+function openMissions(){
+  if(!started||ended)return;
+  resetInputs();placeOpen=true;$('place-overlay').hidden=false;$('place-title').textContent='CITY MISSIONS';
+  $('place-desc').textContent='Pick a job. Each one pays in fictional in-game cash and takes a few minutes. Cancel a running mission from the game menu.';
+  $('place-actions').replaceChildren();
+  if(sideMission)placeButton(`CANCEL ${sideMission.name}`,()=>{closePlace();finishSideMission(false)});
+  for(const id of SIDE_MISSION_IDS){const mission=SIDE_MISSIONS[id];placeButton(`${mission.name} · $${mission.reward}`,()=>startSideMission(id))}
+  placeButton('BACK',closePlace);
+}
+function startSideMission(id){
+  if(missionActive)return;
+  sideMission=createSideMission(id);if(!sideMission)return;
+  missionActive=true;sideMissionKills=0;missionChase=null;
+  const first=sideMissionTarget(sideMission);
+  if(first){target={...first};marker.position.set(target.x,0,target.z)}routeTarget=null;
+  setObjective(sideMission.name,sideMissionObjective(sideMission),1);
+  $('mission-number').textContent='CITY MISSION';
+  $('mission-count').textContent=sideMissionCounter(sideMission)||`STEP 1 / ${SIDE_MISSIONS[id].steps.length}`;
+  marker.visible=true;closePlace();showToast(`${sideMission.name} STARTED`);sound('success');
+}
+function finishSideMission(success){
+  if(!sideMission)return;
+  const result=sideMission;sideMission=null;missionActive=false;missionChase=null;
+  for(const enemy of enemies)scene.remove(enemy.mesh);enemies.length=0;
+  target=entrance(LANDMARKS.find(p=>p.id==='hub'));routeTarget=null;
+  if(success){reward(progress,result.reward);refreshCash();sound('success');showToast(`${result.name} COMPLETE · +$${result.reward}`)}
+  else showToast(`${result.name} CANCELLED`);
+  setObjective('FREE ROAM','Visit the mission hub or open the game menu for more work.',1);
+}
+function updateSideMissionRun(dt){
+  if(!sideMission||sideMission.done||!missionActive)return;
+  const step=SIDE_MISSIONS[sideMission.id]?.steps[sideMission.step];
+  if(!step)return;
+  const pos=vehicle?vehicle.mesh.position:player.position;
+  if(step.kind==='chase'){
+    if(!missionChase)missionChase={x:step.target.x,z:step.target.z,points:step.follow.map(([x,z])=>({x,z})),speed:11};
+    advanceChase(missionChase,dt,world.blocks,movePosition);
+    marker.position.set(missionChase.x,0,missionChase.z);
+    $('mission-count').textContent=`CATCH THE VAN · ${Math.round(Math.hypot(missionChase.x-pos.x,missionChase.z-pos.z))} M`;
+    if(chaseCaught(missionChase,pos)){const state=advanceSideMission(sideMission,pos,0,0,true);missionChase=null;if(state)onSideMissionStep(state)}
+    return;
+  }
+  if(step.kind==='clear'){
+    $('mission-count').textContent=sideMissionCounter(sideMission);
+    if(sideMissionKills>=step.count){const state=advanceSideMission(sideMission,pos,sideMissionKills);if(state)onSideMissionStep(state,true)}
+    return;
+  }
+  const state=advanceSideMission(sideMission,pos);
+  if(state)onSideMissionStep(state);
+}
+function onSideMissionStep(state,fromClear=false){
+  if(!sideMission)return;
+  if(state==='complete'){finishSideMission(true);return}
+  const step=SIDE_MISSIONS[sideMission.id].steps[sideMission.step];
+  target=sideMissionTarget(sideMission);routeTarget=null;
+  if(target)marker.position.set(target.x,0,target.z);
+  $('mission-count').textContent=sideMissionCounter(sideMission)||`STEP ${sideMission.step+1} / ${SIDE_MISSIONS[sideMission.id].steps.length}`;
+  setObjective(sideMission.name,sideMissionObjective(sideMission),1,$('mission-count').textContent);
+  sound('success');showToast(step.label.toUpperCase());
+  if(step.kind==='clear'){sideMissionKills=0;for(const [x,z] of step.spawns)spawnEnemy(x,z,'mission');}
+}
+
+// ---------------------------------------------------------------- RACE ROOM
+// Races are checkpoint races for 2-5 racers. The host holds the race state and
+// shares small snapshots over WebRTC; solo/computer races use the same rules so
+// the HUD and results behave identically online and offline.
+let racePeerOverride=null, race=null, raceUI=null, raceTrackId='city', raceNetModule=null, raceCpuCount=2, raceNameValue=(()=>{try{return (storage?.getItem('aivm-racer-name')||'RACER').slice(0,12)}catch{return 'RACER'}})();
+const raceVisuals=new Map();
+
+function raceName(){return String(raceNameValue||'RACER').trim().slice(0,12).toUpperCase()||'RACER'}
+function raceDisplayName(){return raceNameValue||'YOU'}
+function raceLocalId(){return race?.localId||(race?.isHost?'host':'guest')}
+function racePlayer(){return race?.room?.players.find(p=>p.id===raceLocalId())||null}
+function raceTrack(){return trackById(race?.trackId||raceTrackId)||RACE_TRACKS.city}
+function raceStatusText(text){if(race)race.statusText=text;if(raceOpen&&race)renderRaceRoom()}
+
+function renderRaceRoom(){
+  if(!race||!raceOpen||!raceUI)return;
+  const room=race.room,players=room?.players||[],local=racePlayer();
+  raceUI.renderRoom({
+    code:race.code,trackName:race.trackName||raceTrack().name,status:race.statusText||(race.room?.status==='lobby'?'WAITING FOR RACERS':'RACE IN PROGRESS'),
+    players,canStart:race.isHost&&room?.status==='lobby'&&players.length>=2,canAddBot:room?.status==='lobby',
+    isHost:race.isHost,hint:race.isHost?'Share this code. Start when everyone has joined.':(local?'Waiting for the host to start…':'Connecting…'),
+    formatTime:formatRaceTime,
+  });
+}
+function openRaceRoom(){
+  if(ended||missionActive)return;
+  if(race&&race.status!=='finished'){raceOpen=true;$('race-overlay').hidden=false;renderRaceRoom();return}
+  resetInputs();setWeaponMenu(false);closeGameMenu();raceOpen=true;$('race-overlay').hidden=false;
+  const show=()=>{raceUI=createRaceUI($('race-panel'),{
+    close:closeRaceRoom,track:id=>{raceTrackId=id;raceUI.render()},trackId:()=>raceTrackId,
+    solo:startSoloRace,host:hostRace,join:code=>joinRaceRoom(code),
+    start:()=>{if(!race?.isHost)return;if(!startRoom(race.room,Date.now())){raceStatusText('NEED AT LEAST TWO RACERS');return}broadcastSnapshot();beginRaceCountdown(race.room.startAt)},
+    addBot:()=>{if(!race?.isHost||race.room.players.length>=MAX_RACERS)return;if(addBot(race.room,`CPU ${race.room.players.length}`)){broadcastSnapshot();renderRaceRoom()}},
+    leave:()=>leaveRace(),
+    name:()=>raceNameValue,setName:value=>{raceNameValue=String(value||'').slice(0,12);try{storage?.setItem('aivm-racer-name',raceNameValue)}catch{}},
+    cpuCount:()=>raceCpuCount,setCpuCount:count=>{raceCpuCount=Math.max(1,Math.min(4,Number(count)||2));raceUI?.render()},
+  });raceUI.render()};
+  if(!raceUI)show();else raceUI.render();
+}
+function closeRaceRoom(){
+  if(race&&race.status!=='finished')return leaveRace();
+  raceOpen=false;$('race-overlay').hidden=true;openGameMenu();
+}
+// Builds the visual vehicles used for remote racers and computer racers.
+function raceVehicleVisual(tint){
+  const car=world.vehicle('car',0,0);car.mesh.visible=false;models.vehicle(car,tint);
+  return car;
+}
+function ensureRacerVisual(id,tint){
+  if(raceVisuals.has(id))return raceVisuals.get(id);
+  const visual=raceVehicleVisual(tint);raceVisuals.set(id,visual);return visual;
+}
+function clearRaceVisuals(){
+  for(const visual of raceVisuals.values()){scene.remove(visual.mesh);visual.mesh.traverse(object=>{if(object.geometry)object.geometry.dispose?.()})}
+  raceVisuals.clear();
+}
+// Puts the player in a car on the start grid; any ride they already had is kept.
+function mountRaceVehicle(grid){
+  if(!vehicle){vehicle=world.vehicle('car',0,0);vehicle.variant='sedan-sports';models.vehicle(vehicle,0x9db9c8);vehicle.occupied=true;player.visible=false}
+  vehicle.mesh.visible=true;vehicle.mesh.position.set(grid.x,0,grid.z);vehicle.mesh.rotation.y=grid.yaw;vehicleSpeed=0;player.position.copy(vehicle.mesh.position);
+}
+function finishRaceVehicle(){
+  if(!vehicle)return;
+  const p=vehicle.mesh.position;player.position.set(p.x+3,0,p.z);player.visible=true;vehicle.occupied=false;if(vehicle.rider)vehicle.rider.visible=false;
+  vehicle=null;vehicleSpeed=0;resetInputs();
+}
+function prepareRaceRacers(){
+  const room=race.room,track=raceTrack();
+  room.players.forEach((player,index)=>{
+    const grid=startGrid(track,index);
+    player.x=grid.x;player.z=grid.z;player.r=grid.yaw;player.step=0;player.lap=0;player.finished=false;player.finishTime=null;player.lane=index%2?1:-1;
+    if(player.id===raceLocalId())mountRaceVehicle(grid);
+    else {const visual=ensureRacerVisual(player.id,[0xd1845f,0x8fa6c4,0xd9c48a,0x9fcab0][index%4]);visual.mesh.position.set(grid.x,0,grid.z);visual.mesh.rotation.y=grid.yaw;visual.mesh.visible=true}
+  });
+}
+function startSoloRace(){
+  const local='host',room=createRoom({code:'SOLO',trackId:raceTrackId,hostName:raceDisplayName()});
+  if(!room)return;
+  for(let i=0;i<raceCpuCount;i++)addBot(room,`CPU RIVAL ${i+1}`);
+  race={mode:'solo',isHost:true,localId:local,room,code:'SOLO',trackId:room.trackId,trackName:room.trackName,status:'lobby',statusText:'',net:null};
+  startRoom(room,Date.now());
+  beginRaceCountdown(room.startAt);
+}
+async function hostRace(){
+  const {makeRoomCode,staticRoomCode}=await import('./race.js');
+  const code=makeRoomCode(),room=createRoom({code,trackId:raceTrackId,hostName:raceDisplayName(),now:Date.now()});
+  if(!room)return;
+  race={mode:'online',isHost:true,localId:'host',room,code,trackId:room.trackId,trackName:room.trackName,status:'lobby',statusText:'OPENING ROOM…',net:null,broadcastAt:0};
+  renderRaceRoom();
+  try{
+    const net=await openRaceNet(hostHandlers());
+    if(!net)return;
+    race.net=net;
+    if(!net.host(code)){race.statusText='COULD NOT HOST · TRY ANOTHER CODE';renderRaceRoom();return}
+    race.statusText='WAITING FOR RACERS · SHARE THE CODE';
+  }catch{race.statusText='RACING SERVICE UNAVAILABLE · CHECK YOUR CONNECTION';}
+  renderRaceRoom();
+}
+async function joinRaceRoom(rawCode){
+  const code=staticRoomCode(rawCode);
+  if(code.length<5){raceStatusText('ENTER THE FULL 5-SYMBOL CODE');return}
+  race={mode:'online',isHost:false,localId:null,room:{code,trackId:raceTrackId,trackName:trackById(raceTrackId)?.name||'',status:'lobby',startAt:null,players:[]},code,trackId:raceTrackId,status:'lobby',statusText:`CONNECTING TO ${code}…`,net:null,lastSendAt:0};
+  renderRaceRoom();
+  const net=await openRaceNet(guestHandlers());
+  if(!net)return;
+  race.net=net;net.join(code);
+  race.timeout=setTimeout(()=>{if(race&&race.status==='lobby'&&!race.connected)raceStatusText('NO ANSWER FROM THAT CODE · CHECK IT AND TRY AGAIN')},15000);
+}
+async function openRaceNet(handlers){
+  try{
+    const module=raceNetModule||await import('./race-net.js');
+    raceNetModule=module;
+    const Peer=racePeerOverride||await module.loadPeerClass();
+    return module.createRaceNet(handlers,Peer);
+  }catch(error){console.warn('Could not load online racing',error);raceStatusText('ONLINE RACING COULD NOT LOAD · USE QUICK RACE');return null}
+}
+function applySnapshot(snap){
+  if(!race||!snap)return;
+  if(snap.trackId&&snap.trackId!==race.trackId){race.trackId=snap.trackId;race.trackName=trackById(snap.trackId)?.name||race.trackName}
+  race.room.status=snap.status;race.room.startAt=snap.startAt;
+  const previous=new Map(race.room.players.map(p=>[p.id,p]));
+  race.room.players=snap.players.map(p=>({...p,kind:p.kind==='host'?'host':p.kind==='bot'?'bot':'guest',finished:!!p.fin,finishTime:p.ft??null}));
+  for(const player of race.room.players){const old=previous.get(player.id);if(old){player.lane=old.lane??(race.room.players.indexOf(player)%2?1:-1)}}
+  for(const player of snap.players){
+    if(player.id===raceLocalId())continue;
+    const visual=ensureRacerVisual(player.id,0xd1845f);visual.mesh.visible=true;
+    visual.target={x:player.x,z:player.z,r:player.r};
+  }
+  if(snap.status==='countdown'&&race.status!=='countdown'&&race.status!=='running'&&race.status!=='finished')beginRaceCountdown(snap.startAt);
+  if(snap.status==='running'&&race.status==='countdown'){race.status='running';race.statusText=''}
+  if(snap.status==='finished'&&race.status!=='finished')finishRace();
+  if(raceOpen)renderRaceRoom();
+  if(race.status==='running'&&race.status!=='finished')updateRaceHud();
+}
+function hostHandlers(){
+  const room=()=>race?.room;
+  return {
+    open:()=>{if(race)race.statusText='WAITING FOR RACERS · SHARE THE CODE';renderRaceRoom()},
+    status:text=>raceStatusText(String(text).toUpperCase()),
+    peerOpen:()=>{},
+    peerJoined:peer=>{race?.net?.sendTo(peer,{t:'welcome',trackId:race?.trackId,code:race?.code})},
+    peerLeft:peer=>{if(!race)return;if(room()){leaveRoom(room(),peer);broadcastSnapshot();renderRaceRoom()}},
+    error:()=>{},
+    message:(data,from)=>{
+      if(!race)return;
+      const message=decodeMessage(data);if(!message)return;
+      if(message.t==='hello'){
+        const result=joinRoom(room(),{id:from,name:message.name||'RACER',now:Date.now()});
+        if(!result.ok){race.net.sendTo(from,{t:'reject',reason:result.reason});return}
+        race.net.sendTo(from,{t:'joined',you:from,trackId:race.trackId,code:race.code});
+        broadcastSnapshot();renderRaceRoom();showToast(`${result.player.name} JOINED THE RACE`);
+      } else if(message.t==='p')updateRacerPosition(room(),from,message);
+      else if(message.t==='fin')markFinished(room(),from,message.ft);
+      else if(message.t==='bye'){if(room())leaveRoom(room(),from);broadcastSnapshot();renderRaceRoom()}
+    },
+  };
+}
+function guestHandlers(){
+  return {
+    open:()=>{if(!race)return;race.localId=race.net?.id||null;if(race.timeout)clearTimeout(race.timeout)},
+    peerOpen:host=>{if(!race)return;race.hostPeer=host;race.net?.sendTo(host,{t:'hello',name:raceName()})},
+    status:text=>raceStatusText(String(text).toUpperCase()),
+    peerLeft:()=>{if(race&&race.status!=='finished')raceStatusText('HOST LEFT THE RACE')},
+    error:()=>{},
+    message:data=>{
+      if(!race)return;const message=decodeMessage(data);if(!message)return;
+      if(message.t==='welcome'){race.connected=true;race.trackId=message.trackId||race.trackId;race.trackName=trackById(race.trackId)?.name||race.trackName}
+      else if(message.t==='joined'){
+        if(message.you)race.localId=message.you;
+        race.connected=true;race.statusText='IN THE ROOM · WAITING FOR THE HOST TO START';renderRaceRoom();
+      } else if(message.t==='reject'){raceStatusText(String(message.reason||'COULD NOT JOIN').toUpperCase());}
+      else if(message.t==='snap'){race.connected=true;applySnapshot(message)}
+    },
+  };
+}
+function broadcastSnapshot(){
+  if(!race?.isHost||!race.net)return;
+  const snap=snapshot(race.room,Date.now());
+  if(race.mode==='online')race.net.broadcast(snap);
+}
+function beginRaceCountdown(startAt){
+  if(!race)return;
+  if(race.isHost&&race.room.status==='lobby'){startRoom(race.room,Date.now());startAt=race.room.startAt}
+  race.status='countdown';race.startAt=Number(startAt)||Date.now()+COUNTDOWN_MS;raceOpen=false;$('race-overlay').hidden=true;
+  $('race-hud').hidden=false;$('race-hud-track').textContent=race.trackName||raceTrack().name;
+  $('race-hud-list').replaceChildren();$('race-hud-next').textContent='GET READY';
+  prepareRaceRacers();race.progress=null;race.own=null;race.finishElapsed=null;
+  if(race.isHost){race.room.status='countdown';broadcastSnapshot()}
+  showToast(race.isHost?'RACE STARTING · GOOD LUCK':`RACE STARTING · ${raceTrack().name}`);
+  sound('success');
+}
+function raceElapsed(){return race?Math.max(0,Date.now()-race.startAt):0}
+function startLocalRacePlay(){
+  const local=racePlayer();if(!local)return;
+  race.status='running';race.room.status='running';race.progress=createRaceStateLocal();
+  race.own={step:0,lap:0,finished:false,finishTime:null};
+  setObjective('RACE · '+race.trackName,'Follow the checkpoints. First to finish wins.',1,raceCheckpointLabel());
+  $('mission-number').textContent='RACE';
+  updateRaceTarget();
+}
+function createRaceStateLocal(){
+  const checkpoints=raceTrack().checkpoints.map(point=>({...point}));
+  return {checkpoints,step:0,lap:0,laps:1,finished:false};
+}
+function updateRaceTarget(){
+  const point=race?.progress?.checkpoints[race.progress.step];if(!point)return;
+  target={x:point.x,z:point.z};marker.position.set(target.x,0,target.z);routeTarget=null;
+  $('race-hud-next').textContent=raceCheckpointLabel();
+  $('mission-count').textContent=raceCheckpointLabel();
+}
+// The first point of a track is the start line, so only the rest count as checkpoints.
+function raceCheckpointLabel(){
+  if(!race?.progress)return 'GET READY';
+  if(race.own?.finished)return 'WAITING FOR RIVALS…';
+  const total=race.progress.checkpoints.length-1,step=race.progress.step;
+  return step===0?'START LINE':`CP ${Math.min(step,total)} / ${total}`;
+}
+function advanceLocalRace(){
+  if(!race||race.status!=='running'||race.own?.finished)return;
+  const pos=vehicle?vehicle.mesh.position:player.position,point=race.progress?.checkpoints[race.progress.step];
+  if(!point)return;
+  if(Math.hypot(pos.x-point.x,pos.z-point.z)>9)return;
+  const last=race.progress.step>=race.progress.checkpoints.length-1;
+  if(last){
+    race.own.finished=true;race.own.finishTime=Math.round(raceElapsed());
+    markFinished(race.room,raceLocalId(),race.own.finishTime);
+    {const own=racePlayer();if(own){own.finished=true;own.finishTime=race.own.finishTime;own.step=race.own.step}}
+    if(race.isHost)broadcastSnapshot();else {const host=race.hostPeer||[...(race.net?.peers()||[])] [0];if(host)race.net?.sendTo(host,{t:'fin',ft:race.own.finishTime})}
+    sound('success');showToast(`FINISHED · ${formatRaceTime(race.own.finishTime)} · WAITING FOR RIVALS`);race.graceUntil=Date.now()+12000;
+    if(race.room.players.every(p=>p.finished))finishRace();
+    return;
+  }
+  race.progress.step++;race.own.step=race.progress.step;
+  updateRaceTarget();sound('checkpoint');showToast(`CHECKPOINT ${race.progress.step} / ${race.progress.checkpoints.length-1}`);
+  if(race.isHost)broadcastSnapshot();
+}
+function localSendPosition(){
+  if(!race||race.status!=='running'||!race.net)return;
+  const now=Date.now();if(now-(race.netAt||0)<120)return;race.netAt=now;
+  const pos=vehicle?vehicle.mesh.position:player.position;
+  const message={t:'p',x:Math.round(pos.x*10)/10,z:Math.round(pos.z*10)/10,r:Math.round((vehicle?vehicle.mesh.rotation.y:player.rotation.y)*100)/100,step:race.own?.step||0,lap:0};
+  if(race.isHost)broadcastSnapshot();
+  else {const host=race.hostPeer||[...race.net.peers()][0];if(host)race.net.sendTo(host,message)}
+}
+function updateRaceHud(){
+  if(!race)return;
+  $('race-hud').hidden=false;
+  $('race-hud-track').textContent=race.trackName||raceTrack().name;
+  $('race-hud-timer').textContent=formatRaceTime(race.own?.finished?race.own.finishTime:raceElapsed());
+  const board=standings(race.room),list=$('race-hud-list');list.replaceChildren();
+  for(const entry of board.slice(0,5)){const item=document.createElement('li');item.className=entry.id===raceLocalId()?'you':'';item.textContent=`${entry.place}. ${entry.name}${entry.finished?' ✓':''}`;list.append(item)}
+  const point=race.progress?.checkpoints[race.progress.step];
+  if(point)$('race-hud-next').textContent=raceCheckpointLabel();
+}
+function updateRaceWorld(dt){
+  if(!race)return;
+  if(race.status==='countdown'){
+    const remaining=race.startAt-Date.now();
+    $('race-hud-timer').textContent=remaining>0?Math.ceil(remaining/1000)+'s':'GO!';
+    if(remaining<=0)startLocalRacePlay();
+    return;
+  }
+  if(race.status!=='running'&&race.status!=='finished')return;
+  // Computer racers share the player's checkpoint line.
+  if(race.isHost||race.mode==='solo'){
+    const track=raceTrack(),checkpoints=track.checkpoints;
+    for(const player of race.room.players){
+      if(player.kind!=='bot'||player.finished)continue;
+      const previous=player.step;
+      advanceBot(player,checkpoints,dt,{speed:12.5,blocks:world.blocks,movePosition});
+      if(botCheckpointReached(player,checkpoints,player.step)){
+        if(player.step>=checkpoints.length-1){markFinished(race.room,player.id,Math.round(raceElapsed()))}
+        else player.step++;
+      }
+      if(player.step!==previous&&race.isHost)broadcastSnapshot();
+    }
+  }
+  // Remote vehicles ease toward the last received position.
+  for(const [id,visual] of raceVisuals){const data=race.room.players.find(p=>p.id===id);if(!data||!visual.mesh.visible)continue;
+    const goal=visual.target||{x:data.x,z:data.z,r:data.r},alpha=1-Math.exp(-dt*9);
+    visual.mesh.position.x+=(goal.x-visual.mesh.position.x)*alpha;visual.mesh.position.z+=(goal.z-visual.mesh.position.z)*alpha;
+    let delta=Math.atan2(Math.sin(goal.r-visual.mesh.rotation.y),Math.cos(goal.r-visual.mesh.rotation.y));visual.mesh.rotation.y+=delta*alpha;
+    for(const wheel of visual.wheels)wheel.rotation.x-=dt*4;
+  }
+  if(race.status==='running'){
+    advanceLocalRace();localSendPosition();
+    const now=Date.now();if(now-(race.hudAt||0)>160){race.hudAt=now;updateRaceHud()}
+    updateRoomClock(race.room,now);
+    if(race.own?.finished&&race.graceUntil&&now>=race.graceUntil)finishRace();
+  }
+  if(race.room.status==='finished')finishRace();
+}
+function finishRace(){
+  if(!race||race.status==='finished')return;
+  updateRoomClock(race.room,Date.now());
+  race.status='finished';race.room.status='finished';
+  if(race.isHost)broadcastSnapshot();
+  const board=standings(race.room),myPlace=board.find(entry=>entry.id===raceLocalId())?.place||board.length;
+  if(!race.rewarded){race.rewarded=true;const prize=myPlace===1?400:myPlace===2?250:150;reward(progress,prize);refreshCash();race.prize=prize}
+  if(raceUI&&raceOpen===false){
+    raceOpen=true;$('race-overlay').hidden=false;
+    raceUI.renderResults({trackName:race.trackName,entries:board.length?board:[{place:myPlace,name:'YOU',finished:true,time:race.own?.finishTime||0}],formatTime:formatRaceTime},()=>{leaveRace();openGameMenu()});
+  }
+  $('race-hud').hidden=true;
+  setObjective('RACE COMPLETE',`You finished ${myPlace===1?'first':`${myPlace}${myPlace===2?'nd':myPlace===3?'rd':'th'}`} in the ${race.trackName}.`,1);
+  showToast(`RACE FINISHED · ${myPlace===1?'YOU WIN':`PLACE ${myPlace}`} · +$${race.prize||0}`);
+  // Keep the channel open briefly so late finishers still receive the result.
+  const net=race.net;if(net){setTimeout(()=>{try{net.close()}catch{}},5000);race.net=null}
+}
+function leaveRace(){
+  if(race?.net){try{race.net.close()}catch{}}
+  if(race?.timeout)clearTimeout(race.timeout);
+  clearRaceVisuals();finishRaceVehicle();
+  $('race-hud').hidden=true;raceOpen=false;$('race-overlay').hidden=true;
+  race=null;
+  target=entrance(LANDMARKS.find(p=>p.id==='hub'));routeTarget=null;marker.position.set(target.x,0,target.z);
+  setObjective('FREE ROAM','Visit the game menu for races, jobs and missions.',1);
+  openGameMenu();
+}
+
 const clock=new THREE.Clock();let mapTick=0;
-function animate(){requestAnimationFrame(animate);const elapsed=clock.getDelta(),dt=Math.min(elapsed,.05);if(music)music.update(musicTrack,musicVolume,muted||document.hidden);if(mapOpen||settingsOpen||placeOpen||editingLayout||districtOpen||arcadeOpen||casinoOpen||gameMenuOpen)return;
+function animate(){requestAnimationFrame(animate);const elapsed=clock.getDelta(),dt=Math.min(elapsed,.05);if(music)music.update(race?.status==='running'||missionActive?'race':musicTrack,musicVolume,muted||document.hidden);updateRaceWorld(dt);if(mapOpen||settingsOpen||placeOpen||editingLayout||districtOpen||arcadeOpen||casinoOpen||gameMenuOpen||raceOpen)return;
  if(started&&!ended){gameTime+=Math.min(elapsed,.25);
   let inputX=joy.x+(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0),inputZ=joy.y+(keys.KeyS||keys.ArrowDown?1:0)-(keys.KeyW||keys.ArrowUp?1:0);const len=Math.hypot(inputX,inputZ);if(len>1){inputX/=len;inputZ/=len}
   if(vehicle){
@@ -358,6 +755,7 @@ function animate(){requestAnimationFrame(animate);const elapsed=clock.getDelta()
    if(len>.08){const travelled=insideHome?moveInsideHome(move.x*speed*dt,move.z*speed*dt):movePosition(player.position,move.x*speed*dt,move.z*speed*dt,walkingObstacles(),.2);actualSpeed=dt>0?travelled/dt:0;if(!fireHeld&&!aiming)player.rotation.y=turnTowards(player.rotation.y,Math.atan2(-move.x,-move.z),dt);walkCycle+=dt*(speed/2)}
    animateWalk(player,Math.min(actualSpeed/speed,1),walkCycle,dt,fireHeld,aiming,sprinting,actualSpeed);if(actualSpeed>.5&&gameTime-lastStepSound>(sprinting?.25:.42)){sound('step');lastStepSound=gameTime}
   }
+  updateSideMissionRun(dt);
   if(insideHome&&interiorPeople[interiorPlace.id]?.mesh.visible)animateWalk(interiorPeople[interiorPlace.id].mesh,0,0,dt);if(player.userData.model?.userData.gun)player.userData.model.userData.gun.visible=!insideHome;if(aiming&&!vehicle)player.rotation.y=cameraYaw;if(fireHeld&&!insideHome)shoot();if(reloadEnd&&gameTime>=reloadEnd){ammo[weaponIndex]=weapons[weaponIndex].cap;reloadEnd=0}if(!insideHome)updateEnemies(dt);if(!ended&&!insideHome&&missionActive){if(activity)updateSideActivity(Math.min(elapsed,.25));else updateMission();}if(!ended&&!insideHome)updateNavigation();if(!ended&&!insideHome)updateRival(dt);if(!ended){const cityPos=vehicle?vehicle.mesh.position:player.position;updateCity(dt,cityPos);updateAnimals(dt,cityPos);}if(!ended&&!insideHome&&missionActive&&!activity&&mission===2&&gameTime-lastReinforcement>16&&enemies.filter(e=>e.alive&&e.kind==='pursuer').length<5){const p=vehicle?vehicle.mesh.position:player.position;const z=Math.round(p.z/28)*28;const x=Math.max(-84,Math.min(84,Math.round(p.x/28)*28+(p.x<target.x?-28:28)));spawnEnemy(x,z,'pursuer');lastReinforcement=gameTime;showToast('ENEMY REINFORCEMENTS INBOUND')}
   for(let i=shots.length-1;i>=0;i--)if(shots[i].until<gameTime){scene.remove(shots[i].line);shots[i].line.geometry.dispose();shots[i].line.material.dispose();shots.splice(i,1)}
   $('hud').classList.toggle('driving',!!vehicle);$('hud').classList.toggle('at-home',insideHome);$('health').textContent=Math.ceil(health);$('health-fill').style.width=Math.max(0,Math.min(100,health))+'%';$('health-fill').style.background=health<30?'#ff6b59':'#c9fc51';$('weapon').textContent=vehicle?vehicle.type.toUpperCase():weapons[weaponIndex].name;$('weapon-sub').textContent=vehicle?`${Math.round(Math.abs(vehicleSpeed)*5)} KM/H · TAP EXIT`:reloadEnd?'RELOADING...':aimAssist?'AIM ASSIST ON':'MANUAL AIM';$('ammo').innerHTML=vehicle?'—':`${ammo[weaponIndex]} <small>/ ∞</small>`;const reloading=!!reloadEnd&&!vehicle;$('reload-track').classList.toggle('visible',reloading);const reloadProgress=reloading?Math.round(Math.max(0,Math.min(1,1-(reloadEnd-gameTime)))*100):0;$('reload-fill').style.width=reloadProgress+'%';$('reload-track').setAttribute('aria-valuenow',String(reloadProgress));$('reload-btn').classList.toggle('selected',reloading);
@@ -385,6 +783,18 @@ if(import.meta.env.DEV) window.__aivmTest={
   playerStatus(){const a=player.userData.animation;return {loaded:!!a,role:a?.role,action:a?.current?.getClip().name||null,gun:!!player.userData.model?.userData.gun,visible:player.visible,rate:a?.current?.getEffectiveTimeScale()||0,time:a?.current?.time||0,rotation:player.rotation.y,leftLeg:a?.model?.getObjectByName('mixamorigLeftUpLeg')?.quaternion.toArray(),rightLeg:a?.model?.getObjectByName('mixamorigRightUpLeg')?.quaternion.toArray(),leftKnee:a?.model?.getObjectByName('mixamorigLeftLeg')?.quaternion.toArray(),rightKnee:a?.model?.getObjectByName('mixamorigRightLeg')?.quaternion.toArray()}},
   animalStatus(){return animals.map(a=>({type:a.type,x:a.mesh.position.x,z:a.mesh.position.z,loaded:!!a.mesh.userData.animalAnimation}))},
   renderInfo(){return {calls:renderer.info.render.calls,triangles:renderer.info.render.triangles}},
+  setRacePeer(Peer){racePeerOverride=Peer||null},
+  raceLog(){return race?.log||[]},
+  raceState(){return {open:raceOpen,status:race?.status||null,mode:race?.mode||null,code:race?.code||null,track:race?.trackId||raceTrackId,players:(race?.room?.players||[]).map(p=>({id:p.id,name:p.name,kind:p.kind,step:p.step,finished:p.finished,time:p.finishTime})),own:race?.own||null,next:race?.progress?.checkpoints[race.progress.step]||null,prize:race?.prize||0}},
+  startSoloRace(id='city'){raceTrackId=id;startSoloRace()},
+  skipCountdown(){if(race){race.startAt=Date.now();race.status='countdown'}},
+  raceCheckpoint(){const point=race?.progress?.checkpoints[race.progress.step];return point?{x:point.x,z:point.z}:null},
+  debugNearbyBlocks(x,z){return world.blocks.filter(b=>Math.abs(b.x-x)<b.halfX+10&&Math.abs(b.z-z)<b.halfZ+10).map(b=>({x:b.x,z:b.z,hx:+b.halfX.toFixed(1),hz:+b.halfZ.toFixed(1)}))},
+  sideMissionTarget(){const t=sideMissionTarget(sideMission);return t?{...t}:null},
+  clearMissionEnemies(){enemies.filter(e=>e.alive&&e.kind==='mission').forEach(e=>damageEnemy(e,100))},
+  sideMissionState(){return {active:!!sideMission,id:sideMission?.id||null,step:sideMission?.step||0,kills:sideMissionKills,objective:sideMission?sideMissionObjective(sideMission):null,chase:missionChase?{x:missionChase.x,z:missionChase.z}:null}},
+  startSideMission(id){startSideMission(id)},
+  openMissions(){openMissions()},
   targets(){return enemies.filter(e=>e.alive).map(e=>{const p=e.mesh.position.clone().add(new THREE.Vector3(0,1.35,0)).project(camera);return {x:(p.x+1)*innerWidth/2,y:(1-p.y)*innerHeight/2,hp:e.hp,kind:e.kind}})}
 };
 $('cash-display').textContent=`$${progress.money}`;marker.position.set(target.x,0,target.z);camera.position.set(0,5.2,21);currentRoute=roadRoute(player.position,target);applyLayout(controlLayout);updateMap();animate();
