@@ -1,16 +1,16 @@
 // Real-time race transport. PeerJS opens a WebRTC data channel between the
 // host's phone and each joining phone; the room code is the host's peer id, so
 // no server of our own is needed. Only small race messages are sent.
-import { staticRoomCode } from './race.js';
+import { roomPeerId, PEER_PREFIX, normalizeRaceClass } from './race.js';
 
-export const PEER_PREFIX = 'aivm-race-v1-';
+export { PEER_PREFIX };
 export const ICE_SERVERS = [
   { urls:'stun:stun.l.google.com:19302' },
   { urls:'stun:global.stun.twilio.com:3478' },
   { urls:'stun:stun1.l.google.com:19302' },
 ];
 export const peerOptions = (debug = 0) => ({ debug, config:{ iceServers:ICE_SERVERS } });
-export const hostPeerId = code => PEER_PREFIX + staticRoomCode(code);
+export const hostPeerId = (code, cls = 'car') => roomPeerId(code, cls);
 
 // Human-readable text for the transport failures a phone can realistically hit.
 export function describePeerError(error) {
@@ -50,23 +50,23 @@ export function createRaceNet(handlers = {}, Peer = null) {
     get isHost() { return host; },
     peers() { return [...connections.keys()]; },
     setPeerClass(value) { Peer = value; },
-    host(code) {
+    host(code, cls = 'car') {
       if (!Peer) { emit('status', 'Online racing is still loading. Try again.'); return false; }
       host = true; closed = false;
-      try { peer = new Peer(hostPeerId(code), peerOptions()); } catch (error) { emit('error', error); emit('status', describePeerError(error)); return false; }
+      try { peer = new Peer(hostPeerId(code, cls), peerOptions()); } catch (error) { emit('error', error); emit('status', describePeerError(error)); return false; }
       peer.on('open', () => emit('open', peer.id, true));
       peer.on('connection', connection => wire(connection, true));
       peer.on('error', error => { emit('error', error); emit('status', describePeerError(error)); });
       peer.on('disconnected', () => { if(!closed) { emit('status', 'RACE SERVICE UNREACHABLE · TRY QUICK RACE'); try { peer.reconnect(); } catch {} } });
       return true;
     },
-    join(code) {
+    join(code, cls = 'car') {
       if (!Peer) { emit('status', 'Online racing is still loading. Try again.'); return false; }
       host = false; closed = false;
       try { peer = new Peer(undefined, peerOptions()); } catch (error) { emit('error', error); emit('status', describePeerError(error)); return false; }
       peer.on('open', () => {
         emit('open', peer.id, false);
-        const connection = peer.connect(hostPeerId(code), { reliable:true });
+        const connection = peer.connect(hostPeerId(code, cls), { reliable:true });
         if(!connection) { emit('status', 'No race found with that code.'); return; }
         wire(connection, false);
       });

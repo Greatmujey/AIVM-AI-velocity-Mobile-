@@ -1,6 +1,6 @@
 // Race menus: solo / computer / hosted code / join with code, plus the live
 // race position board. All network work is delegated to the callbacks passed in.
-import { RACE_TRACKS, TRACK_IDS, MAX_RACERS, makeRoomCode, normalizeCode } from './race.js';
+import { RACE_TRACKS, TRACK_IDS, MAX_RACERS, makeRoomCode, normalizeCode, RACE_CLASSES, RACE_CLASS_IDS, tracksForClass, classOfTrack, normalizeRaceClass, prizeFor } from './race.js';
 
 const el = (tag, className, text) => { const node = document.createElement(tag); if(className)node.className = className; if(text!==undefined)node.textContent = text; return node };
 
@@ -10,29 +10,42 @@ export function createRaceUI(panel, handlers = {}) {
     panel.replaceChildren();
     const wrap = el('div', 'race-ui');
     const head = el('div', 'race-head');
+    const raceClass = normalizeRaceClass(handlers.raceClass?.());
     const title = el('div');
-    title.append(el('small', '', 'AIVM · 2–5 RACERS'), el('h2', '', 'RACE ROOM'));
+    title.append(el('small', '', `AIVM · 2–5 RACERS · ${RACE_CLASSES[raceClass].short}`), el('h2', '', raceClass === 'bike' ? 'BIKE RACE ROOM' : 'CAR RACE ROOM'));
     head.append(title);
     const close = el('button', 'dialog-close', '✕'); close.setAttribute('aria-label', 'Close race room');
     close.onclick = () => call('close');
     head.append(close);
     wrap.append(head);
-    wrap.append(el('p', 'race-note', 'Host a race to get a code, then up to four friends on other phones join with that code. Everyone races the same checkpoints in real time. Computer racers can fill empty seats.'));
+    // Cars and bikes are separate disciplines: switching class swaps the track
+    // list, the prizes and the room code namespace, so the grids never mix.
+    const classRow = el('div', 'race-classes');
+    for (const id of RACE_CLASS_IDS) {
+      const button = el('button', 'race-class' + (id === raceClass ? ' selected' : ''), RACE_CLASSES[id].label);
+      button.setAttribute('aria-pressed', String(id === raceClass));
+      button.onclick = () => call('setRaceClass', id);
+      classRow.append(button);
+    }
+    wrap.append(el('small', 'race-label', 'RACE TYPE'), classRow);
+    wrap.append(el('p', 'race-note', RACE_CLASSES[raceClass].blurb + ' Host a race to get a code; up to four friends on other phones join with that code and race the same checkpoints in real time. Computer racers fill empty seats.'));
+    const prizes = RACE_CLASSES[raceClass].prizes;
+    wrap.append(el('p', 'race-note race-small', `Prizes: 1st $${prizes[0]} · 2nd $${prizes[1]} · 3rd $${prizes[2]}. Bikes and cars race separately, so join a ${RACE_CLASSES[raceClass].short.toLowerCase()} code with a ${RACE_CLASSES[raceClass].short.toLowerCase()} room.`));
 
     const trackRow = el('div', 'race-tracks');
-    for (const id of TRACK_IDS) {
+    for (const id of tracksForClass(raceClass)) {
       const button = el('button', 'race-track', RACE_TRACKS[id].name);
       button.onclick = () => call('track', id);
       trackRow.append(button);
     }
-    wrap.append(el('small', 'race-label', 'TRACK'), trackRow);
+    wrap.append(el('small', 'race-label', raceClass === 'bike' ? 'BIKE TRACK' : 'CAR TRACK'), trackRow);
 
     const row = (label, hint, onClick, className = '') => {
       const button = el('button', 'race-action ' + className, label);
       if (hint) button.append(el('small', '', hint));
       button.onclick = onClick; return button;
     };
-    const solo = row('QUICK RACE', `You against ${handlers.cpuCount?.() ?? 2} computer racers`, () => call('solo'));
+    const solo = row(raceClass === 'bike' ? 'QUICK BIKE RACE' : 'QUICK CAR RACE', `You against ${handlers.cpuCount?.() ?? 2} computer ${raceClass === 'bike' ? 'riders' : 'drivers'}`, () => call('solo'));
     const roster = el('div', 'race-actions');
     roster.append(solo, row('HOST RACE · GET A CODE', 'Open a lobby others can join', () => call('host'), 'primary-race'));
     wrap.append(roster);
@@ -52,11 +65,11 @@ export function createRaceUI(panel, handlers = {}) {
     const input = el('input', 'race-input'); input.id = 'race-code-input'; input.maxLength = 5; input.inputMode = 'text'; input.autocapitalize = 'characters'; input.autocomplete = 'off';
     input.setAttribute('aria-label', 'Race code'); input.placeholder = 'CODE';
     input.addEventListener('input', () => { input.value = normalizeCode(input.value) });
-    const join = row('JOIN WITH CODE', 'Racer 2 to 5', () => call('join', input.value));
+    const join = row('JOIN WITH CODE', `Racer 2 to 5 · ${RACE_CLASSES[raceClass].short}`, () => call('join', input.value));
     joinRow.append(input, join); wrap.append(joinRow);
     wrap.append(el('p', 'race-note race-small', 'Online racing needs both phones online and uses a free peer-to-peer service. Some mobile networks block direct connections; if a code cannot connect, use Quick Race instead.'));
     panel.append(wrap);
-    const active = TRACK_IDS.indexOf(handlers.trackId?.());
+    const active = tracksForClass(raceClass).indexOf(classOfTrack(handlers.trackId?.()) === raceClass ? handlers.trackId?.() : null);
     const trackButtons = [...panel.querySelectorAll('.race-tracks')][0]?.querySelectorAll('.race-track') || [];
     trackButtons.forEach((button, index) => button.classList.toggle('selected', index === active));
     setTimeout(() => input.focus({ preventScroll: true }), 30);
@@ -66,7 +79,8 @@ export function createRaceUI(panel, handlers = {}) {
     panel.replaceChildren();
     const wrap = el('div', 'race-ui race-room');
     const head = el('div', 'race-head');
-    const title = el('div'); title.append(el('small', '', state.trackName || 'RACE ROOM'), el('h2', '', state.code ? `CODE ${state.code}` : 'RACE ROOM'));
+    const roomClass = normalizeRaceClass(state.vehicleClass || classOfTrack(state.trackId));
+    const title = el('div'); title.append(el('small', '', `${RACE_CLASSES[roomClass].label} · ${state.trackName || 'RACE ROOM'}`), el('h2', '', state.code ? `CODE ${state.code}` : 'RACE ROOM'));
     head.append(title, (() => { const close = el('button', 'dialog-close', '✕'); close.setAttribute('aria-label', 'Leave race room'); close.onclick = () => call('leave'); return close })());
     wrap.append(head);
     wrap.append(el('p', 'race-status', state.status || 'Connecting…'));
@@ -75,7 +89,8 @@ export function createRaceUI(panel, handlers = {}) {
     for (const player of state.players || []) {
       const item = el('li', 'race-player');
       item.append(el('span', 'race-player-name', `${player.name}${player.kind === 'host' ? ' · HOST' : player.kind === 'bot' ? ' · CPU' : ''}`));
-      item.append(el('span', 'race-player-state', player.finished ? `FINISHED ${state.formatTime ? state.formatTime(player.time) : ''}` : `CP ${Math.min((player.step || 0) + 1, 5)}`));
+      const total = state.totalCheckpoints || 5;
+      item.append(el('span', 'race-player-state', player.finished ? `FINISHED ${state.formatTime ? state.formatTime(player.time) : ''}` : `CP ${Math.min((player.step || 0) + 1, total)} / ${total}`));
       list.append(item);
     }
     if (state.players?.length >= MAX_RACERS) wrap.append(el('p', 'race-note', 'Race is full: 5 of 5 seats taken.'));
@@ -93,18 +108,21 @@ export function createRaceUI(panel, handlers = {}) {
     const wrap = el('div', 'race-ui race-countdown');
     wrap.append(el('small', '', 'RACE STARTING'));
     wrap.append(el('div', 'race-count', String(Math.max(0, seconds))));
-    wrap.append(el('p', 'race-note', `${state?.trackName || 'TRACK'} · ${state?.players?.length || 0} RACERS`));
+    const countClass = normalizeRaceClass(state?.vehicleClass || classOfTrack(state?.trackId));
+    wrap.append(el('p', 'race-note', `${state?.trackName || 'TRACK'} · ${state?.players?.length || 0} ${countClass === 'bike' ? 'RIDERS' : 'CARS'}`));
     panel.replaceChildren(wrap);
   }
 
   function renderResults(state, onLeave) {
     const wrap = el('div', 'race-ui race-results');
-    wrap.append(el('small', '', state.trackName || 'RACE'));
+    const resultClass = normalizeRaceClass(state.vehicleClass || classOfTrack(state.trackId));
+    wrap.append(el('small', '', `${RACE_CLASSES[resultClass].label} · ${state.trackName || 'RACE'}`));
     wrap.append(el('h2', '', 'FINISH'));
     const list = el('ol', 'race-list');
     for (const entry of state.entries || []) {
       const item = el('li', 'race-player');
-      item.append(el('span', 'race-player-name', `${entry.place}. ${entry.name}`));
+      const money = entry.finished ? prizeFor(resultClass, entry.place) : 0;
+      item.append(el('span', 'race-player-name', `${entry.place}. ${entry.name}${money ? ` · $${money}` : ''}`));
       item.append(el('span', 'race-player-state', entry.finished ? (state.formatTime ? state.formatTime(entry.time) : String(entry.time)) : 'DID NOT FINISH'));
       list.append(item);
     }

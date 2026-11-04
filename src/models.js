@@ -16,6 +16,9 @@ export function createModels(renderer) {
     return cache.get(name);
   }
   ['human','human-anims','player-marcus','sedan-sports','suv-luxury','taxi','hatchback-sports','motorcycle','cat','dog'].forEach(load);
+  // Catalog vehicles load on demand (see `vehicle`); the common city types are
+  // warmed up here so the first taxi or saloon does not pop in late.
+  ['sedan','suv','van','truck','police','delivery','race','race-future'].forEach(load);
   function createHuman(gltf, animations, role) {
     const model=cloneSkeleton(gltf.scene);
     // One precomputed mesh LOD per person, rather than rendering all four at once.
@@ -74,14 +77,16 @@ export function createModels(renderer) {
   }
   async function vehicle(vehicle,tint=null) {
     const gltf=await load(vehicle.type==='bike'?'motorcycle':(vehicle.variant||'sedan-sports'));if(!gltf)return;
+    const paint=tint===null?vehicle.tint??null:tint;
     const model=gltf.scene.clone(true),bounds=new THREE.Box3().setFromObject(model),size=bounds.getSize(new THREE.Vector3());
-    const length=vehicle.type==='bike'?3.25:4.8,scale=length/size.z;
+    const length=vehicle.length||(vehicle.type==='bike'?3.25:4.8),scale=length/size.z;
     const visual=new THREE.Group();visual.rotation.y=Math.PI;model.scale.setScalar(scale);model.position.y=-bounds.min.y*scale;visual.add(model);
-    model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(tint!==null&&o.material){o.material=o.material.clone();o.material.color.multiply(new THREE.Color(tint))}}});
+    model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(paint!==null&&o.material){o.material=o.material.clone();o.material.color.multiply(new THREE.Color(paint))}}});
     for(const child of vehicle.mesh.children)child.visible=false;
     if(vehicle.type==='car'){
       const head=new THREE.MeshBasicMaterial({color:0xffe5b1}),tail=new THREE.MeshBasicMaterial({color:0xf15241});
-      for(const x of [-.85,.85])for(const [z,material] of [[-2.37,head],[2.37,tail]]){const lamp=new THREE.Mesh(new THREE.BoxGeometry(.42,.16,.08),material);lamp.position.set(x,.85,z);visual.add(lamp)}
+      const lampZ=2.37*(length/4.8);
+      for(const x of [-.85,.85])for(const [z,material] of [[-lampZ,head],[lampZ,tail]]){const lamp=new THREE.Mesh(new THREE.BoxGeometry(.42,.16,.08),material);lamp.position.set(x,.85,z);visual.add(lamp)}
     }
     vehicle.mesh.add(visual);vehicle.visual=visual;vehicle.wheels=[];model.traverse(o=>{if(/wheel[-_]/i.test(o.name))vehicle.wheels.push(o)});
     if(vehicle.type==='bike') {

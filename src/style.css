@@ -138,3 +138,16 @@
  .race-tracks{grid-template-columns:1fr 1fr}
  .race-track{padding:8px 9px;font-size:11px}
 }
+
+/* --- Race disciplines: cars and bikes are chosen before a track --- */
+.race-classes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:2px 0 4px}
+.race-class{min-height:46px;border-radius:14px;border:1px solid rgba(201,252,81,.28);background:rgba(10,20,20,.55);color:#dff3d8;font:700 12px ui-monospace,monospace;letter-spacing:.12em;padding:9px 10px;cursor:pointer}
+.race-class.selected{background:linear-gradient(180deg,rgba(201,252,81,.28),rgba(201,252,81,.1));border-color:#c9fc51;color:#f4ffe0;box-shadow:0 0 0 1px rgba(201,252,81,.4) inset}
+
+/* --- Crowd speech bubbles: plain DOM over the canvas, positioned by projection --- */
+.bubble-layer{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:4}
+.speech-bubble{position:absolute;transform:translate(-50%,-100%);max-width:min(46vw,240px);padding:6px 10px 7px;border-radius:13px;background:rgba(12,22,20,.9);border:1px solid rgba(201,252,81,.45);box-shadow:0 6px 18px rgba(0,0,0,.45);color:#f2ffe6;font:600 12px/1.35 ui-sans-serif,system-ui,sans-serif;letter-spacing:.01em;text-align:center;animation:bubble-in .18s ease-out}
+.speech-bubble::after{content:'';position:absolute;left:50%;bottom:-7px;width:10px;height:10px;margin-left:-5px;background:rgba(12,22,20,.9);border-right:1px solid rgba(201,252,81,.45);border-bottom:1px solid rgba(201,252,81,.45);transform:rotate(45deg)}
+.speech-bubble[hidden]{display:none}
+@keyframes bubble-in{from{opacity:0;transform:translate(-50%,-92%) scale(.94)}to{opacity:1;transform:translate(-50%,-100%) scale(1)}}
+@media (max-width:520px){.speech-bubble{max-width:56vw;font-size:11px;padding:5px 8px 6px}}

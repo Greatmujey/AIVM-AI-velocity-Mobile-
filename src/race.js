@@ -6,15 +6,45 @@ export const CHECKPOINT_RADIUS = 7;
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 // Checkpoints sit on road intersections of the existing city grid.
+// Car races and bike races are separate disciplines: separate tracks, separate
+// rooms, separate codes and separate prizes. A bike room never mixes with cars.
 export const RACE_TRACKS = {
-  city: {name:'CITY CIRCUIT', checkpoints:[{x:0,z:0},{x:0,z:-56},{x:56,z:-56},{x:56,z:0},{x:0,z:0}]},
-  coast: {name:'VILLAGE SPRINT', checkpoints:[{x:56,z:56},{x:112,z:56},{x:112,z:112},{x:56,z:112},{x:56,z:56}]},
-  port: {name:'PORT LOOP', checkpoints:[{x:-56,z:-56},{x:-56,z:-112},{x:-112,z:-112},{x:-112,z:-56},{x:-56,z:-56}]},
-  hills: {name:'HILL RUN', checkpoints:[{x:56,z:-56},{x:56,z:-112},{x:112,z:-112},{x:112,z:-56},{x:56,z:-56}]},
-  desert: {name:'DESERT DASH', checkpoints:[{x:-56,z:56},{x:-112,z:56},{x:-112,z:112},{x:-56,z:112},{x:-56,z:56}]},
+  city: {name:'CITY CIRCUIT', class:'car', checkpoints:[{x:0,z:0},{x:0,z:-56},{x:56,z:-56},{x:56,z:0},{x:0,z:0}]},
+  downtown: {name:'DOWNTOWN NIGHT LOOP', class:'car', checkpoints:[{x:-28,z:-56},{x:28,z:-56},{x:28,z:-140},{x:-28,z:-140},{x:-28,z:-56}]},
+  coast: {name:'VILLAGE SPRINT', class:'car', checkpoints:[{x:56,z:56},{x:112,z:56},{x:112,z:112},{x:56,z:112},{x:56,z:56}]},
+  port: {name:'PORT LOOP', class:'car', checkpoints:[{x:-56,z:-56},{x:-56,z:-112},{x:-112,z:-112},{x:-112,z:-56},{x:-56,z:-56}]},
+  hills: {name:'HILL RUN', class:'car', checkpoints:[{x:56,z:-56},{x:56,z:-112},{x:112,z:-112},{x:112,z:-56},{x:56,z:-56}]},
+  desert: {name:'DESERT DASH', class:'car', checkpoints:[{x:-56,z:56},{x:-112,z:56},{x:-112,z:112},{x:-56,z:112},{x:-56,z:56}]},
+  // Bike-only courses: tighter turns, back streets and trails a car cannot use.
+  alley: {name:'MARKET ALLEY TT', class:'bike', checkpoints:[{x:28,z:28},{x:28,z:56},{x:56,z:56},{x:56,z:28},{x:28,z:28}]},
+  boardwalk: {name:'BOARDWALK BIKE RUN', class:'bike', checkpoints:[{x:84,z:56},{x:112,z:56},{x:140,z:84},{x:112,z:112},{x:84,z:56}]},
+  docklane: {name:'DOCK LANE SPRINT', class:'bike', checkpoints:[{x:-56,z:-56},{x:-84,z:-84},{x:-112,z:-56},{x:-84,z:-28},{x:-56,z:-56}]},
+  ridge: {name:'RIDGE CLIMB TT', class:'bike', checkpoints:[{x:56,z:-56},{x:84,z:-84},{x:112,z:-56},{x:84,z:-28},{x:56,z:-56}]},
+  trail: {name:'DESERT TRAIL RIDE', class:'bike', checkpoints:[{x:-84,z:56},{x:-56,z:84},{x:-84,z:112},{x:-112,z:84},{x:-84,z:56}]},
+  downtownBike: {name:'TOWER UNDERPASS', class:'bike', checkpoints:[{x:-28,z:-84},{x:0,z:-112},{x:28,z:-84},{x:0,z:-56},{x:-28,z:-84}]},
 };
 export const TRACK_IDS = Object.keys(RACE_TRACKS);
 export const trackById = id => RACE_TRACKS[id] || null;
+
+// Two racing disciplines. Bikes get their own tracks, prizes and handling.
+export const RACE_CLASSES = {
+  car: {id:'car', label:'CAR RACES', short:'CARS', blurb:'Five-car grids on the city circuits.', prizes:[400,250,150]},
+  bike: {id:'bike', label:'BIKE RACES', short:'BIKES', blurb:'Bike-only courses: tighter turns, quicker starts.', prizes:[300,200,120]},
+};
+export const RACE_CLASS_IDS = Object.keys(RACE_CLASSES);
+export function normalizeRaceClass(value) { return String(value || '').trim().toLowerCase() === 'bike' ? 'bike' : 'car'; }
+export function classOfTrack(id) { return normalizeRaceClass(RACE_TRACKS[id]?.class); }
+export function tracksForClass(cls) { const c = normalizeRaceClass(cls); return TRACK_IDS.filter(id => RACE_TRACKS[id].class === c); }
+export function defaultTrackFor(cls) { return tracksForClass(cls)[0] || TRACK_IDS[0]; }
+// A room code carries its class, so a bike code cannot be joined by a car room.
+export const PEER_PREFIX = 'aivm-race-v2-';
+export function roomPeerId(code, cls = 'car') {
+  return `${PEER_PREFIX}${normalizeRaceClass(cls)}-${staticRoomCode(code)}`;
+}
+export function prizeFor(cls, place) {
+  const prizes = RACE_CLASSES[normalizeRaceClass(cls)]?.prizes || RACE_CLASSES.car.prizes;
+  return prizes[Math.max(0, Math.min(prizes.length - 1, place - 1))] ?? prizes.at(-1);
+}
 
 export function makeRoomCode(random = Math.random, length = 5) {
   let code = '';
@@ -63,11 +93,14 @@ export function startGrid(track, index = 0) {
 
 // A room is a lobby of 2-5 racers that becomes one race. The host owns the
 // authoritative copy; guests mirror snapshots of it.
-export function createRoom({code, trackId, hostName = 'HOST', now = 0}) {
+export function createRoom({code, trackId, hostName = 'HOST', now = 0, vehicleClass = null}) {
   const track = trackById(trackId);
   if (!track) return null;
+  const cls = normalizeRaceClass(vehicleClass || track.class);
+  // A car track can never be raced on bikes, or the other way round.
+  if (track.class !== cls) return null;
   return {
-    code, trackId, trackName:track.name, status:'lobby', hostId:'host', createdAt:now, startAt:null,
+    code, trackId, trackName:track.name, vehicleClass:cls, className:RACE_CLASSES[cls].label, status:'lobby', hostId:'host', createdAt:now, startAt:null,
     players:[{id:'host', name:String(hostName).slice(0, 12) || 'HOST', kind:'host', x:0, z:0, r:0, step:0, lap:0, finished:false, finishTime:null, connected:true}],
   };
 }
@@ -151,7 +184,7 @@ export function decodeMessage(raw) {
 }
 export function snapshot(room, now) {
   return {
-    t:'snap', now, code:room.code, trackId:room.trackId, status:room.status, startAt:room.startAt,
+    t:'snap', now, code:room.code, trackId:room.trackId, cls:room.vehicleClass || classOfTrack(room.trackId), status:room.status, startAt:room.startAt,
     players:room.players.map(p => ({id:p.id, name:p.name, kind:p.kind, x:Math.round(p.x * 10) / 10, z:Math.round(p.z * 10) / 10, r:Math.round(p.r * 100) / 100, step:p.step, lap:p.lap, fin:p.finished, ft:p.finishTime})),
   };
 }

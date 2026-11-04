@@ -17,10 +17,27 @@ This is an inspiration and implementation note, not a claim that we reproduced a
 - Camera-relative movement, a zoomed aiming mode, reticle-based optional aim assist, cover/line-of-sight checks, hit markers and weapon audio.
 - A delivery with a rival-car pursuit and a drop-zone shootout, hostile guards, final-mission reinforcements, and a street-network GPS route. The chase works with a bike, car or on foot; it is a small scripted prototype rather than a full police simulation.
 - An original coastal neighbourhood inspired by the broader look of urban open-world games: homes, storefronts, palms, utility lines and warmer lighting. It remains a stylized, small-scale prototype.
+- Seven connected districts with their own buildings, ground and traffic mixes; 21 enterable places including a dealership, clinic, club, gym, market hall, offices and diners, each furnished and populated.
+- A ~178-person civilian simulation with face-to-face street conversations, speech bubbles, vendors and bench sitters; the player can talk to any stranger for hints, food, bets and gifts.
+- Independent car and bike racing: separate tracks, hosted rooms, peer ids and prize tables per discipline, plus one-lap street bets against a named stranger.
+- A 22-model parody vehicle catalogue with per-model handling, dealership purchases saved on the device, call-to-side garage vehicles, and carjackable ambient traffic that raises a 0-3 star wanted level.
+
+## City-life systems research (open-world "GTA-style" feel)
+
+We studied how the Grand Theft Auto series builds the feeling of a living city, using public reference material (community wikis on its businesses and enterable interiors, forum discussions of its fake-brand tradition, and modding pages about world variety). The transferable techniques, none of which use Rockstar code, names, logos or assets:
+
+- **A commercial layer of fictional parody brands.** GTA's shops and car marques (Pegassi, Cluckin' Bell, Sprunk…) are invented stand-ins for real brands. AIVM copies the *technique*: every marque, billboard and shop sign is an original parody (HALCYON MOTORS, SABLE 240, PALM CAB, BREEZE COURIERS, NIGHT OWL LOUNGE, METRO PD…), defined in `src/vehicles.js` and `src/world.js`.
+- **Enterable interiors reachable from the street.** Many GTA buildings open by standing at their doors. AIVM gives all 21 landmarks a real room with furniture and people inside (`src/interiors.js`, `src/interior-collision.js`), entered from the doorstep.
+- **Vehicle variety as gameplay.** GTA spawns mixed traffic, colour variants, service vehicles and dealership purchases. AIVM ships a 22-model CC0 Kenney fleet across 10+ parody marques with per-district traffic mixes, a dealership with saved purchases, and carjackable traffic.
+- **A wanted level that escalates and cools down.** AIVM implements 0–3 stars, patrol cars that chase while they can see you, arrests that cost cash and respawn you at the clinic, and heat that decays out of sight (`src/main.js`).
+- **Dense ambient population with social behaviour.** GTA fills streets and interiors with pedestrians who chat in scenarios. AIVM runs ~178 district-weighted civilians who walk, loiter, vend, sit and hold face-to-face conversations with speech bubbles (`src/crowd.js`, `src/gestures.js`, `src/bubbles.js`), and the player can stop any of them for a street conversation (`src/street-talk.js`).
+- **Districts with distinct identity and their own racing.** GTA's regions differ in architecture and activities. AIVM has seven districts with different building styles, ground, traffic mixes and crowd density (`src/city-data.js`, `src/world.js`), and car racing is a separate discipline from bike racing with its own tracks, rooms and prizes (`src/race.js`).
+
+What we deliberately did **not** copy: no real brand names, logos, vehicle liveries, map layouts, dialogue, music or code from GTA or any other commercial game. Everything above is an original, small-scale implementation of public design ideas.
 
 ## Honest limitations / next priorities
 
-The city, traffic and combat are still small-scale. Traffic and pedestrians are ambient, not a complete simulation. Driving physics and enemy tactics are simplified. The game has not been validated on physical mobile devices. Priorities: test on real phones, tune frame rate and touch layout, make enemy pursuit and cover more intelligent, and strengthen one mission into a polished showcase before adding scope.
+The city, traffic and combat are still small-scale. Traffic and pedestrians are ambient, not a complete simulation; interiors are single rooms per building rather than multi-floor spaces. Driving physics and enemy tactics are simplified. The game has not been validated on physical mobile devices. Priorities: test on real phones, tune frame rate and touch layout, make enemy pursuit and cover more intelligent, and strengthen one mission into a polished showcase before adding scope.
 
 ## Touch-control references
 
