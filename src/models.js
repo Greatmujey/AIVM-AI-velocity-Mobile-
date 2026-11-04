@@ -83,7 +83,7 @@ export function createModels(renderer) {
       const head=new THREE.MeshBasicMaterial({color:0xffe5b1}),tail=new THREE.MeshBasicMaterial({color:0xf15241});
       for(const x of [-.85,.85])for(const [z,material] of [[-2.37,head],[2.37,tail]]){const lamp=new THREE.Mesh(new THREE.BoxGeometry(.42,.16,.08),material);lamp.position.set(x,.85,z);visual.add(lamp)}
     }
-    vehicle.mesh.add(visual);vehicle.wheels=[];model.traverse(o=>{if(/wheel[-_]/i.test(o.name))vehicle.wheels.push(o)});
+    vehicle.mesh.add(visual);vehicle.visual=visual;vehicle.wheels=[];model.traverse(o=>{if(/wheel[-_]/i.test(o.name))vehicle.wheels.push(o)});
     if(vehicle.type==='bike') {
       const [personGltf,animations]=await Promise.all([load('player-marcus'),load('human-anims')]);if(!personGltf||!animations)return;
       const human=createHuman(personGltf,animations,'rider'),rider=human.visual;rider.scale.setScalar(.84);rider.position.set(0,.82,.15);rider.visible=false;

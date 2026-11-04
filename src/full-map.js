@@ -34,7 +34,7 @@ export function drawFullMap(canvas, { blocks, position, target, route, enemies, 
   // Key destinations are anchored to the real entrance points.
   for (const place of LANDMARKS) {
     const p = point(entrance(place)); ctx.beginPath(); ctx.arc(p.x,p.y,12,0,Math.PI*2);
-    ctx.fillStyle=place.color;ctx.fill();ctx.strokeStyle='#182925';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#122b25';ctx.font='bold 15px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(({home:'H',hub:'M',friend:'F',church:'C',mosque:'Q',hotel:'T',casino:'$'})[place.id],p.x,p.y+1);
+    ctx.fillStyle=place.color;ctx.fill();ctx.strokeStyle='#182925';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#122b25';ctx.font='bold 15px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(({home:'H',hub:'M',friend:'F',church:'C',mosque:'Q',hotel:'T',shop:'S',casino:'$'})[place.id],p.x,p.y+1);
   }
   if (route.length > 1) {
     ctx.lineWidth = 8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';

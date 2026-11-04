@@ -1,4 +1,4 @@
-const DEFAULTS = { muted: false, aimAssist: true, lookSensitivity: 5, sfxVolume: .7, musicVolume: .35, musicTrack: 'coast' };
+const DEFAULTS = { muted: false, aimAssist: true, lookSensitivity: 5, sfxVolume: .7, musicVolume: .35, musicTrack: 'coast', graphicsQuality: 'balanced' };
 const KEY = 'aivm-settings-v1';
 
 export function loadPreferences(storage) {
@@ -12,6 +12,7 @@ export function loadPreferences(storage) {
       lookSensitivity: Number.isFinite(value) && value >= 1 && value <= 10 ? value : DEFAULTS.lookSensitivity,
       sfxVolume: volume('sfxVolume'), musicVolume: volume('musicVolume'),
       musicTrack: ['off','coast','night'].includes(data.musicTrack) ? data.musicTrack : DEFAULTS.musicTrack,
+      graphicsQuality: ['balanced','performance'].includes(data.graphicsQuality) ? data.graphicsQuality : DEFAULTS.graphicsQuality,
     };
   } catch { return { ...DEFAULTS }; }
 }

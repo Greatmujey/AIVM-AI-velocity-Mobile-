@@ -159,7 +159,7 @@ export function createWorld(scene) {
 
   function specialBuilding(place){
     const {x,z,kind,name}=place, h=kind==='hotel'?12:kind==='casino'?7:kind==='church'||kind==='mosque'?6:4.6;
-    const facade=mat(({home:0xe2b99a,hub:0x4d8e87,friend:0xd49d8a,church:0xe5dbca,mosque:0xd2d7c2,hotel:0xe5aa83,casino:0x985576})[kind],{map:wallDetail});
+    const facade=mat(({home:0xe2b99a,hub:0x4d8e87,friend:0xd49d8a,church:0xe5dbca,mosque:0xd2d7c2,hotel:0xe5aa83,shop:0xd1ac64,casino:0x985576})[kind],{map:wallDetail});
     structure(11,h,10,x,z,facade);box(11.5,.4,10.5,trim,x,h+.45,z,scene,false);
     box(1.8,2.6,.16,wood,x,1.55,z+5.1,scene,false);
     for(const side of [-1,1]){box(2.5,1.8,.12,windowMat,x+side*3.4,2.15,z+5.1,scene,false);box(2.9,.12,.3,concrete,x+side*3.4,1.15,z+5.2,scene,false)}

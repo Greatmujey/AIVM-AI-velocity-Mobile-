@@ -8,6 +8,7 @@ export const LANDMARKS = [
   {id:'church',name:'CHURCH',x:-98,z:42,color:'#ccd9ff',kind:'church'},
   {id:'mosque',name:'MOSQUE',x:98,z:42,color:'#94dec8',kind:'mosque'},
   {id:'hotel',name:'HOTEL',x:70,z:-42,color:'#ffbb87',kind:'hotel'},
+  {id:'shop',name:'PALM GROVE SHOP',x:42,z:42,color:'#f0d17d',kind:'shop'},
   {id:'casino',name:'CASINO',x:-70,z:-42,color:'#ee85bd',kind:'casino'},
 ];
 export const entrance = place => ({x:place.x,z:place.z+8});
