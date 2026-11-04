@@ -123,6 +123,17 @@ export function createWorld(scene) {
     box(w*.8,.18,1.3,roofs[seed%roofs.length],x,3.2,z+d/2+.55,scene,false);box(1.6,2.3,.1,wood,x,1.4,z+d/2+.08,scene,false);
     box(2,.8,1.5,trim,x+2,h+.9,z,scene,false);
   }
+  // A small downtown cluster: glazed facades and strong horizontal floor lines.
+  // Decorations remain batched and collision stays on the building footprint.
+  const modernGlass=mat(0x617f88,{metalness:.38,roughness:.3}),modernTrim=mat(0xc4cbc7),modernBase=mat(0x343f41);
+  function modernTower(x,z,seed){
+    const h=20+(seed%4)*4;structure(11,h,10.5,x,z,modernGlass);
+    box(11.4,3,10.9,modernBase,x,1.75,z,scene,false);
+    box(1.8,2.5,.12,glass,x,1.5,z+5.5,scene,false);
+    for(let y=4.5;y<h;y+=3){box(11.2,.18,.14,modernTrim,x,y,z+5.32,scene,false);box(.14,.18,10.8,modernTrim,x+5.6,y,z,scene,false);box(.14,.18,10.8,modernTrim,x-5.6,y,z,scene,false)}
+    for(const dx of [-3.6,0,3.6])box(.13,h-3,.13,modernTrim,x+dx,(h+3)/2,z+5.34,scene,false);
+    box(11.6,.45,11,modernTrim,x,h+.45,z,scene,false);
+  }
   // District landmarks and neighbourhood architecture share the same
   // collision footprints as other structures; decorative detail stays in lots.
   const villageWalls=[mat(0xe6c99a),mat(0xd9a478),mat(0xbabf99)],thatch=mat(0x9a774c), corrugated=mat(0x687e7c),
@@ -178,6 +189,7 @@ export function createWorld(scene) {
     else if(district==='harbor')harborWarehouse(x,z,seed);
     else if(district==='hills')hillsideHome(x,z,seed);
     else if(district==='desert')desertHome(x,z,seed);
+    else if(z<=-42&&Math.abs(x)<=42&&seed%2===0)modernTower(x,z,seed);
     else if(z>=14)house(x,z,seed);
     else if(z>=-14||seed%3===0)store(x,z,seed);
     else apartment(x,z,seed);

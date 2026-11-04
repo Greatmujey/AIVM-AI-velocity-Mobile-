@@ -9,3 +9,4 @@ test('invalid saved progress and unknown items are safe',()=>{
  assert.deepEqual(loadProgress({getItem(){return '{bad'}}),{money:0,owned:[]});
  const p=loadProgress({getItem(){return '{"money":-3,"owned":["fake","car"]}'}});assert.equal(p.money,0);assert.deepEqual(p.owned,['car']);assert.equal(purchase(p,'fake'),false);
 });
+test('new weapon unlocks charge once and survive storage',()=>{const p={money:2000,owned:[]};assert.equal(purchase(p,'revolver'),true);assert.equal(purchase(p,'battle'),true);assert.equal(p.money,550);assert.equal(purchase(p,'revolver'),false);let value;saveProgress({setItem(k,v){value=v}},p);assert.deepEqual(loadProgress({getItem(){return value}}),p)});

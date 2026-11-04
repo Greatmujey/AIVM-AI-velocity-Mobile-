@@ -111,7 +111,7 @@ export function animatePerson(group,amount,dt,shooting=false,aiming=false,sprint
   a.mixer.update(dt);return true;
 }
 
-export function updateWeapon(group,index){group.userData.weaponIndex=index;const gun=group.userData.model?.userData.gun;if(gun)gun.scale.y=[1,2.3,1.8,1.6,2.8][index]||1;}
+export function updateWeapon(group,index){group.userData.weaponIndex=index;const gun=group.userData.model?.userData.gun;if(gun)gun.scale.y=[1,2.3,1.8,1.6,2.8,1.2,2.5][index]||1;}
 
 export function animateAnimal(group,moving,dt) {
   const a=group.userData.animalAnimation;if(!a)return;const next=moving?a.actions.walk:a.actions.idle;
@@ -120,4 +120,13 @@ export function animateAnimal(group,moving,dt) {
 export function setHitFlash(group,on){
   group.userData.torso?.material.emissive.setHex(on?0x8d2b18:0);
   for(const material of group.userData.model?.userData.flashMaterials||[])material.emissive.setHex(on?0x8d2b18:0);
+}
+
+// Switch only civilian meshes between authored LODs. Keep the player/enemy
+// rigs intact and avoid recomputing or cloning their animation data.
+export function setCivilianLOD(group, far) {
+  const a=group.userData.animation;if(!a||!a.role.startsWith('civilian'))return;
+  const lod=far?'player_LOD3':'player_LOD2';if(group.userData.civilianLod===lod)return;
+  const near=a.model.getObjectByName('player_LOD2'),distant=a.model.getObjectByName('player_LOD3');
+  if(!near||!distant)return;near.visible=!far;distant.visible=far;group.userData.civilianLod=lod;
 }

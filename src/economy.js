@@ -1,5 +1,5 @@
 const KEY = 'aivm-progress-v1';
-export const PRICES = { smg: 400, sniper: 700, car: 550 };
+export const PRICES = { smg: 400, sniper: 700, car: 550, revolver: 600, battle: 850 };
 export function loadProgress(storage) {
   try {
     const data = JSON.parse(storage?.getItem(KEY) || '{}');

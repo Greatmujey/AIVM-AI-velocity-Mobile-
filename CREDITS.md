@@ -19,3 +19,5 @@ All assets below are included locally; they are not taken from GTA or Call of Du
 
 - **District foliage** (`public/assets/models/nature/`): Kenney Nature Kit, CC0 1.0. Source: [Kenney Nature Kit](https://kenney.nl/assets/nature-kit); GLB mirror: [Hidencod/tge-assets](https://github.com/Hidencod/tge-assets/tree/7be9b573bc74f32ed766b44b3f46550d02ca83b5/packs/nature-kit).
 - **District selector previews** (`public/assets/districts/`): screenshots captured from AIVM itself.
+
+- **Chess rules engine**: [chess.js](https://github.com/jhlywa/chess.js) by Jeff Hlywa, BSD 2-Clause; included license: `public/assets/licenses/chess-js.txt`.
