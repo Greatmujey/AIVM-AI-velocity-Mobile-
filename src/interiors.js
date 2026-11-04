@@ -22,6 +22,7 @@ export function createInteriors(scene) {
     }else if(kind==='casino'){
       box(9,.05,8,red,0,.04,-1);
       for(const x of [-5,-3,3,5]){box(1.4,2,1.2,dark,x,1,-4.8);box(1,.8,.08,blue,x,1.5,-4.14);box(.9,.12,.35,gold,x,.9,-4.05)}
+      for(const x of [-6,6])for(const z of [1,3]){box(1.2,2,1.4,dark,x,1,z);box(.08,.8,1,blue,x+(x<0?.65:-.65),1.5,z);box(.3,.12,.9,gold,x+(x<0?.7:-.7),.9,z)}
       box(3,.75,2,green,0,.85,-1);box(3.3,.12,2.3,wood,0,1.25,-1);
     }else if(kind==='shop'){
       box(10,1.2,1,wood,0,.6,-4.7);box(10,.12,1.2,cream,0,1.24,-4.7);

@@ -13,7 +13,7 @@ export function createWorld(scene) {
   const glass = mat(0x668a9b, {metalness:.35, roughness:.25});
   const glow = new THREE.MeshBasicMaterial({color:0xd7f977});
   const red = new THREE.MeshBasicMaterial({color:0xef6e55});
-  const blocks = [], buildingMeshes = [], staticBoxes = []; let collectingStatic = true;
+  const blocks = [], buildingMeshes = [], staticBoxes = [], obstacles = []; let collectingStatic = true;
   function box(w,h,d,m,x,y,z,parent=scene,shadow=true) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);
     mesh.position.set(x,y,z); mesh.castShadow=shadow; mesh.receiveShadow=true; parent.add(mesh); if(collectingStatic&&parent===scene&&!shadow)staticBoxes.push(mesh); return mesh;
@@ -101,7 +101,7 @@ export function createWorld(scene) {
   function store(x,z,seed){
     const w=11.8,d=10.8,h=4.4+(seed%2)*.6;structure(w,h,d,x,z,stucco[(seed+2)%stucco.length]);box(w+.45,.35,d+.45,roofs[seed%roofs.length],x,h+.4,z);
     box(w*.88,.26,1.55,roofs[(seed+1)%roofs.length],x,2.85,z+d/2+.65,scene,false);
-    box(w*.82,1.05,.12,signs[seed%signs.length],x,3.65,z+d/2+.09,scene,false);
+    box(w*.82,1.05,.12,signs[Math.abs((seed+Math.round(x/14)*3+Math.round(z/14)*5)%signs.length)],x,3.65,z+d/2+.09,scene,false);
     box(w*.76,2,.08,windowMat,x,1.35,z+d/2+.08,scene,false);box(1.25,2.3,.12,wood,x,1.4,z+d/2+.17,scene,false);
     // Individual panes and alternating awning strips break up the plain frontage.
     for(const side of [-1,1]){box(.08,1.9,.1,concrete,x+side*w*.2,1.35,z+d/2+.16,scene,false);box(w*.29,.07,.1,concrete,x+side*w*.21,1.5,z+d/2+.16,scene,false)}
@@ -205,12 +205,20 @@ export function createWorld(scene) {
   for(let x=-7;x<=7;x+=2)box(.18,.18,.18,glow,x,6.25,.25,scene,false);
   // Lamps and small street furniture, clear of the main driving lanes.
   for(let x=-ROAD_LIMIT;x<=ROAD_LIMIT;x+=28)for(let z=-ROAD_LIMIT;z<=ROAD_LIMIT;z+=28){
-    if((x+z)%56===0){box(.16,5.5,.16,trim,x+6.6,2.75,z+6.6,scene,false);box(1.4,.12,.16,trim,x+6,5.4,z+6.6,scene,false);box(.55,.12,.4,glow,x+5.4,5.3,z+6.6,scene,false)}
+    if((x+z)%56===0){obstacles.push({x:x+6.6,z:z+6.6,halfX:.25,halfZ:.25});box(.16,5.5,.16,trim,x+6.6,2.75,z+6.6,scene,false);box(1.4,.12,.16,trim,x+6,5.4,z+6.6,scene,false);box(.55,.12,.4,glow,x+5.4,5.3,z+6.6,scene,false)}
   }
   // Street furniture is placed close to the curb, outside the driving lanes.
   for(let x=-56;x<=56;x+=56)for(let z=-56;z<=56;z+=56){
     box(.18,4.5,.18,trim,x-7,2.25,z-7,scene,false);box(.7,1.5,.45,trim,x-7,4,z-7,scene,false);
     box(.4,.3,.08,red,x-7,4.45,z-6.76,scene,false);box(.4,.3,.08,glow,x-7,3.65,z-6.76,scene,false);
+  }
+  // Contemporary transit shelters and ticket machines on major city streets.
+  const transitBlue=mat(0x377a7e), machineScreen=new THREE.MeshBasicMaterial({color:0x9ddfd6});
+  for(const x of [-56,0,56])for(const z of [-56,0,56]){
+    const sx=x+8.3,sz=z+10;obstacles.push({x:sx,z:sz,halfX:.55,halfZ:2.1});
+    for(const dz of [-2,2])box(.12,3,.12,trim,sx,1.6,sz+dz,scene,false);
+    box(1.1,.16,4.3,transitBlue,sx,3.15,sz,scene,false);box(.08,2.3,3.8,glass,sx,1.55,sz,scene,false);
+    box(.65,1.35,.6,transitBlue,sx-.35,.8,sz-1.35,scene,false);box(.1,.45,.4,machineScreen,sx-.69,1.05,sz-1.35,scene,false);
   }
   // Tall curved palms: a warm, recognisable street silhouette without borrowed game art.
   const bark=mat(0x81725a), leaf=mat(0x526c43,{side:THREE.DoubleSide});
@@ -236,13 +244,13 @@ export function createWorld(scene) {
   }
   // Opening-block street dressing: decorative only, kept away from travel lanes.
   const paint=mat(0xe7d0a5), benchWood=mat(0x805a3c), planter=mat(0xc88866), leaves=mat(0x567651);
-  for(const [x,z] of [[-7.8,17],[7.8,-17],[-7.8,-34],[7.8,34]]){
+  for(const [x,z] of [[-7.8,17],[7.8,-17],[-7.8,-34],[7.8,34]]){obstacles.push({x,z,halfX:.4,halfZ:1.05});
     // Bench alongside the pavement, with separate slats and metal legs.
     for(let i=-1;i<=1;i++)box(.18,.12,2.1,benchWood,x+i*.24,.72,z,scene,false);
     for(const dz of [-.75,.75]){box(.6,.1,.12,trim,x,.68,z+dz,scene,false);box(.1,.65,.1,trim,x-.24,.34,z+dz,scene,false);box(.1,.65,.1,trim,x+.24,.34,z+dz,scene,false)}
     box(.1,.72,2.1,benchWood,x-.36,1.16,z,scene,false);
   }
-  for(const [x,z] of [[-7.6,23],[7.6,-22],[-7.6,-45],[7.6,41]]){
+  for(const [x,z] of [[-7.6,23],[7.6,-22],[-7.6,-45],[7.6,41]]){obstacles.push({x,z,halfX:.55,halfZ:.55});
     box(1.1,.65,1.1,planter,x,.38,z,scene,false);box(.9,.65,.9,leaves,x,.98,z,scene,false);box(.5,.4,.5,greenery,x,1.42,z,scene,false);
   }
   // Curbs, drains and painted parking bays give the road an inhabited scale.
@@ -292,5 +300,5 @@ export function createWorld(scene) {
     else {for(const sx of [-1,1])for(const sz of [-1.5,1.5])wheel(sx*1.4,sz,.52,.4);box(2.8,.75,4.8,body,0,1,0,g);box(2.45,.8,2.35,glass,0,1.73,.15,g);box(2.5,.16,2.4,body,0,2.18,.15,g);for(const sx of [-1,1]){box(.09,.8,2.3,metal,sx*1.2,1.73,.15,g);box(.1,.1,.55,dark,sx*1.43,1.24,.65,g)}box(2.6,.22,.15,dark,0,.7,-2.46,g);for(const x of [-.9,.9]){box(.5,.22,.1,glow,x,1.12,-2.43,g);box(.55,.2,.1,red,x,1.12,2.43,g)}box(2.5,.13,.12,metal,0,.85,2.46,g)}
     g.position.set(x,0,z);scene.add(g);return {type,mesh:g,wheels};
   }
-  return {mat,box,blocks,buildingMeshes,person,vehicle};
+  return {mat,box,blocks,obstacles,buildingMeshes,person,vehicle};
 }

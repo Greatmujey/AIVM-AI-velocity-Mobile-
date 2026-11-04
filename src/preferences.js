@@ -1,4 +1,4 @@
-const DEFAULTS = { muted: false, aimAssist: true, lookSensitivity: 5, sfxVolume: .7, musicVolume: .35, musicTrack: 'coast', graphicsQuality: 'balanced', aimSensitivity: 5, steerSensitivity: 5, invertLook: false, highContrast: false };
+const DEFAULTS = { muted: false, aimAssist: true, lookSensitivity: 5, sfxVolume: .7, musicVolume: .35, musicTrack: 'coast', graphicsQuality: 'balanced', aimSensitivity: 5, steerSensitivity: 5, invertLook: false, highContrast: false, voiceLines: false };
 const KEY = 'aivm-settings-v1';
 
 export function loadPreferences(storage) {
@@ -10,6 +10,7 @@ export function loadPreferences(storage) {
       muted: typeof data.muted === 'boolean' ? data.muted : DEFAULTS.muted,
       aimSensitivity: Number.isFinite(Number(data.aimSensitivity)) && Number(data.aimSensitivity)>=1 && Number(data.aimSensitivity)<=10 ? Number(data.aimSensitivity) : DEFAULTS.aimSensitivity,
       steerSensitivity: Number.isFinite(Number(data.steerSensitivity)) && Number(data.steerSensitivity)>=1 && Number(data.steerSensitivity)<=10 ? Number(data.steerSensitivity) : DEFAULTS.steerSensitivity,
+      voiceLines: typeof data.voiceLines === 'boolean' ? data.voiceLines : DEFAULTS.voiceLines,
       highContrast: typeof data.highContrast === 'boolean' ? data.highContrast : DEFAULTS.highContrast,
       invertLook: typeof data.invertLook === 'boolean' ? data.invertLook : DEFAULTS.invertLook,
       aimAssist: typeof data.aimAssist === 'boolean' ? data.aimAssist : DEFAULTS.aimAssist,
