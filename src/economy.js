@@ -1,4 +1,7 @@
-const KEY = 'aivm-progress-v1';
+let KEY = 'aivm-progress-v1';
+// Accounts scope their own save slot; guests keep the plain key.
+export function setProgressScope(scope) { KEY = scope ? `aivm-progress-v1#${scope}` : 'aivm-progress-v1' }
+export function progressKey() { return KEY }
 export const PRICES = { smg: 400, sniper: 700, car: 550, revolver: 600, battle: 850, mg: 900, bazooka: 1200 };
 export function loadProgress(storage) {
   try {

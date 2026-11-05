@@ -25,6 +25,8 @@ import { advanceBot, botCheckpointReached } from './race-ai.js';
 import { SIDE_MISSIONS, SIDE_MISSION_IDS, createSideMission, sideMissionTarget, sideMissionObjective, sideMissionCounter, advanceSideMission, advanceChase, chaseCaught } from './missions.js';
 import { createRaceUI } from './race-ui.js';
 import { loadProgress, saveProgress, purchase, reward, PRICES } from './economy.js';
+import { setProgressScope } from './economy.js';
+import { registerAccount, signInAccount, getSessionAccount, signOut } from './accounts.js';
 import { CONTROL_IDS, loadLayout, saveLayout, applyLayout } from './control-layout.js';
 import { createMusic } from './music.js';
 import { movePosition, blocked, hasLineOfSight, relativeMovement, objectiveDirection } from './navigation.js';
@@ -46,7 +48,7 @@ document.querySelector('#app').innerHTML = `
  <div class="map-body"><div class="full-map-wrap"><canvas id="full-map" width="630" height="630" aria-label="North-up map showing the complete city streets, buildings and current objective"></canvas><span class="full-map-north">N ↑</span></div>
  <div class="map-legend"><strong>LEGEND</strong><span><b class="legend-you">▲</b> YOU</span><span><b class="legend-goal">◆</b> OBJECTIVE</span><span><b class="legend-route">━</b> GPS ROUTE</span><span><b class="legend-enemy">●</b> ENEMY</span><span><b class="legend-vehicle">■</b> VEHICLE</span><span><b style="color:#72e2b6">●</b> HOME</span><span><b style="color:#f4d46c">●</b> MISSION HUB</span><span><b style="color:#ee85bd">●</b> CITY PLACES</span><small class="place-list" id="map-legend-list">H HOME · M MISSION HUB<br>TAP A PIN FOR GPS (FREE ROAM)</small><small>GAME PAUSED<br><span id="map-orient-note">Map turns as you turn.</span></small></div></div></div>
 </div>
-<div class="screen main-menu" id="intro"><div class="menu-shade"></div><div class="menu-content"><div class="menu-kicker">PALM GROVE CITY</div><img class="menu-logo" src="${import.meta.env.BASE_URL}assets/logo.png" alt="AIVM — AI Velocity Mobile"><p>YOUR CITY. YOUR STORY.</p><div class="menu-actions"><button class="primary" id="start">PLAY <span>↗</span></button><button class="menu-button" id="menu-districts">ENVIRONMENTS <span id="district-choice">CITY CENTRE</span></button><button class="menu-button" id="menu-activities">GAME MENU <span>↗</span></button><button class="menu-button" id="menu-map">CITY MAP <span>↗</span></button><button class="menu-button" id="menu-settings">SETTINGS <span>⚙</span></button></div><div class="menu-meta"><span>OPEN WORLD PROTOTYPE</span><span>MENU ART IS AN ILLUSTRATION</span></div></div></div>
+<div class="screen main-menu" id="intro"><div class="menu-shade"></div><div class="menu-content"><div class="menu-kicker">PALM GROVE CITY</div><img class="menu-logo" src="${import.meta.env.BASE_URL}assets/logo.png" alt="AIVM — AI Velocity Mobile"><p>YOUR CITY. YOUR STORY.</p><div class="menu-actions"><button class="primary" id="start">PLAY <span>↗</span></button><button class="menu-button" id="menu-districts">ENVIRONMENTS <span id="district-choice">CITY CENTRE</span></button><button class="menu-button" id="menu-activities">GAME MENU <span>↗</span></button><button class="menu-button" id="menu-map">CITY MAP <span>↗</span></button><button class="menu-button" id="menu-settings">SETTINGS <span>⚙</span></button><button class="menu-button" id="menu-account">ACCOUNT <span id="account-state">SIGN IN ↗</span></button></div><div class="menu-meta"><span>OPEN WORLD PROTOTYPE</span><span>MENU ART IS AN ILLUSTRATION</span></div></div></div>
 <div class="district-overlay" id="district-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="district-title"><section class="district-panel"><div class="district-head"><div><small>ONE CONNECTED CITY · SEVEN DISTRICTS</small><h2 id="district-title">CHOOSE YOUR ENVIRONMENT</h2><p id="district-help">Swipe to explore. These are views from the game, not separate maps.</p></div><button id="district-close" class="dialog-close" aria-label="Close environment selection">✕</button></div><div class="district-scroll" id="district-scroll" aria-label="Available districts"></div><div class="district-footer"><span id="district-caption">Selected: Palm Grove</span><button id="district-travel" hidden>TRAVEL NOW ↗</button><button id="district-confirm">CONFIRM DISTRICT ↗</button></div></section></div>
 <div class="game-menu-overlay" id="game-menu-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="game-menu-title"><section class="game-menu-card"><div class="dialog-head"><div><small>EXPLORE AIVM</small><h2 id="game-menu-title">GAME MENU</h2></div><button id="game-menu-close" class="dialog-close" aria-label="Close game menu">✕</button></div><p id="game-menu-note"></p><div id="game-menu-grid" class="game-menu-grid"></div></section></div>
 <div class="arcade-overlay" id="arcade-overlay" hidden role="dialog" aria-modal="true" aria-label="Arcade"><section class="arcade-panel" id="arcade-panel"></section></div>
@@ -57,7 +59,18 @@ document.querySelector('#app').innerHTML = `
 <div class="place-overlay" id="place-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="place-title"><div class="place-card"><div class="dialog-head"><div><small>PALM GROVE · CITY LIFE</small><h2 id="place-title"></h2></div><button id="place-close" class="dialog-close" aria-label="Close location">✕</button></div><p id="place-desc"></p><div id="place-actions" class="place-actions"></div></div></div>
 <div class="scope-overlay" id="scope-overlay" hidden aria-label="Sniper scope"><div class="scope-vignette"></div><div class="scope-cross"><i></i><i></i></div><div class="scope-ui"><button id="scope-zoom-in" aria-label="Zoom lens in">🔍 LENS +</button><button id="scope-zoom-out" aria-label="Zoom lens out">🔍 LENS −</button><button id="scope-breath" aria-label="Hold breath to steady the scope">🫁 HOLD BREATH</button><button id="scope-leave" aria-label="Leave the roof">❌ LEAVE ROOF</button><div class="scope-info" id="scope-info">LENS 2× · 🫁 TO STEADY</div></div></div>
 <div class="jail-overlay" id="jail-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="jail-title"><div class="jail-card"><h2 id="jail-title">🚔 BUSTED</h2><p id="jail-text"></p><p class="jail-count" id="jail-count">RELEASE IN 25s</p><button id="jail-bail" class="primary">💵 PAY BAIL · $150</button></div></div>
-<div class="screen hidden" id="end"><div class="panel"><div class="panel-kicker" id="end-kicker">MISSION REPORT</div><h1 id="end-title">RUN <span>COMPLETE.</span></h1><div class="lead" id="end-text"></div><div class="feature-row"><span>THANKS FOR PLAYING</span><span>PROTOTYPE BUILD</span></div><button class="primary" id="retry">RETRY MISSION &nbsp; ↗</button><button class="secondary" id="return-city" hidden>RETURN TO CITY</button><button class="secondary" id="restart">START OVER</button></div></div>`;
+<div class="screen hidden" id="end"><div class="panel"><div class="panel-kicker" id="end-kicker">MISSION REPORT</div><h1 id="end-title">RUN <span>COMPLETE.</span></h1><div class="lead" id="end-text"></div><div class="feature-row"><span>THANKS FOR PLAYING</span><span>PROTOTYPE BUILD</span></div><button class="primary" id="retry">RETRY MISSION &nbsp; ↗</button><button class="secondary" id="return-city" hidden>RETURN TO CITY</button><button class="secondary" id="restart">START OVER</button></div></div>
+<div class="screen hidden" id="account-screen"><div class="panel"><div class="panel-kicker">AIVM ACCOUNT</div><h1 id="account-title">SIGN <span>IN.</span></h1>
+<form id="account-form" class="account-form" autocomplete="off" novalidate>
+<p class="lead" id="account-lead">Quick email + password. Your cash, weapons and garage are saved to your account — sign in again and you continue exactly where you left off.</p>
+<label for="account-email">EMAIL<input id="account-email" type="email" inputmode="email" placeholder="you@example.com" autocomplete="username"></label>
+<label for="account-password">PASSWORD<input id="account-password" type="password" placeholder="At least 4 characters" autocomplete="current-password"></label>
+<p class="account-msg" id="account-msg" role="status"></p>
+<div class="account-actions"><button type="submit" class="primary" id="account-signin">SIGN IN ↗</button><button type="button" class="secondary" id="account-create">✨ CREATE ACCOUNT</button></div>
+</form>
+<div id="account-signed" hidden><p class="lead">SIGNED IN AS <strong id="account-email-display"></strong></p><p class="account-msg">Your save follows this account on this device.</p><div class="account-actions"><button class="secondary" id="account-signout">SIGN OUT</button></div></div>
+<button class="secondary" id="account-close">CLOSE</button>
+<div class="feature-row"><span>SAVED ON THIS DEVICE</span><span>GUEST PLAY STILL WORKS</span></div></div></div>`;
 
 const $ = id => document.getElementById(id);
 const canvas = $('game');
@@ -97,9 +110,23 @@ function catalogVehicle(id,x,z,yaw=0){
   return v;
 }
 const vehicles=parking.map(([id,x,z,yaw])=>catalogVehicle(id,x,z,yaw));
+// Signed-in accounts save under their own scoped keys, so anyone who created
+// an account can sign back in and continue from where they left off.
+let storage=null;try{storage=window.localStorage}catch{}
+let accountScope=null;{const sessionAccount=getSessionAccount(storage);if(sessionAccount)accountScope=sessionAccount.id;setProgressScope(accountScope)}
 // Bought vehicles are remembered and can be called to the player's side.
-let ownedVehicles=[];try{ownedVehicles=JSON.parse(window.localStorage?.getItem('aivm-garage')||'[]')}catch{ownedVehicles=[]}
+function garageKey(){return accountScope?`aivm-garage#${accountScope}`:'aivm-garage'}
+let ownedVehicles=[];function loadGarage(){try{ownedVehicles=JSON.parse(storage?.getItem(garageKey())||'[]')}catch{ownedVehicles=[]}}
+loadGarage();
 let lastOwnedVehicle=null;
+// "Continue where you left off": a small per-account snapshot (spot on the map,
+// health, heat, weapon and ammo) saved as you play, on sign-out and when the
+// tab closes; pressing PLAY restores it for whoever is signed in.
+const RESUME_KEY='aivm-resume-v1';
+function resumeKey(){return accountScope?`${RESUME_KEY}#${accountScope}`:RESUME_KEY}
+function saveResume(){try{storage?.setItem(resumeKey(),JSON.stringify({v:1,x:+player.position.x.toFixed(1),z:+player.position.z.toFixed(1),yaw:+cameraYaw.toFixed(2),health:Math.round(health),heat,weaponIndex,ammo:ammo.slice()}))}catch{}}
+function loadResume(){try{const d=JSON.parse(storage?.getItem(resumeKey())||'null');return d&&Number.isFinite(d.x)&&Number.isFinite(d.z)?d:null}catch{return null}}
+let lastResumeSave=0;
 // Ambient traffic drives both axes. Each district gets its own mix, so the port
 // runs trucks and the market runs bikes, the way a real city does.
 const TRAFFIC_MIX={
@@ -245,7 +272,7 @@ const JAIL={x:-48,z:-104};
 
 const weapons=[{name:'PISTOL',cap:12,rate:.32,damage:34,range:28},{name:'ASSAULT RIFLE',cap:30,rate:.12,damage:18,range:34},{name:'SHOTGUN',cap:6,rate:.7,damage:68,range:19},{name:'SMG',cap:36,rate:.09,damage:14,range:26,unlock:'smg'},{name:'MARKSMAN',cap:8,rate:.8,damage:85,range:55,unlock:'sniper'},{name:'REVOLVER',cap:6,rate:.55,damage:60,range:31,unlock:'revolver'},{name:'BATTLE RIFLE',cap:20,rate:.18,damage:29,range:42,unlock:'battle'},{name:'MACHINE GUN',cap:60,rate:.07,damage:12,range:30,auto:true,unlock:'mg'},{name:'BAZOOKA',cap:1,rate:1.9,damage:0,range:70,explosive:true,unlock:'bazooka'}];
 const ammo=weapons.map(w=>w.cap),enemies=[],shots=[],keys={};
-let storage=null;try{storage=window.localStorage}catch{}const preferences=loadPreferences(storage), progress=loadProgress(storage); let controlLayout=loadLayout(storage);
+const preferences=loadPreferences(storage), progress=loadProgress(storage); let controlLayout=loadLayout(storage);
 let mapOpen=false, settingsOpen=false, placeOpen=false, editingLayout=false, districtOpen=false, arcadeOpen=false, gameMenuOpen=false, raceOpen=false, sideMission=null, activity=null, selectedDistrict=DISTRICTS[0], insideHome=true, interiorPlace=LANDMARKS[0], missionActive=false, rival=null, dropKills=0; let mapRotate=preferences.mapRotate, controlScale=preferences.controlScale, scoped=false, scopeZoom=1, breathUntil=0, sniperActive=false, tempSniper=false, sniperPrev=null, sniperSpawns=[], lastBark=-9;
 let music=null, sfxVolume=preferences.sfxVolume,musicVolume=preferences.musicVolume,musicTrack=preferences.musicTrack,graphicsQuality=preferences.graphicsQuality; const rewardsPaid=new Set();
 let vehicle=null, vehicleSpeed=0, health=100, mission=0, phase=0, kills=0, heat=0, started=false, ended=false, sideMissionKills=0, fireHeld=false, sprintHeld=false, aiming=false, aimAssist=preferences.aimAssist, lookSensitivity=preferences.lookSensitivity, aimSensitivity=preferences.aimSensitivity, steerSensitivity=preferences.steerSensitivity, invertLook=preferences.invertLook, highContrast=preferences.highContrast, voiceLines=preferences.voiceLines;
@@ -370,6 +397,10 @@ function ejectDriver(car){const old=civilians.filter(c=>c.ejected);if(old.length
  // talked to like anybody else on the street.
  civilians.push({x:p.x+3,z:p.z,ry:0,dir:1,speed:1.9,mode:'walk',district:districtAt(p.x,p.z),role:'civilian-warm',lane:{axis:'z',fixed:p.x+3,from:Math.max(-138,p.z-34),to:Math.min(138,p.z+34)},anchor:null,radius:0,pause:0,think:4,line:null,lineUntil:0,cooldown:gameTime+6,partner:null,mesh,walk:0,requested:false,animElapsed:0,ejected:true,id:civilians.length+1000});
  showToast(`DRIVER PULLED OUT · ${car.brand?`${car.brand} ${car.model} TAKEN`:'CAR TAKEN'}`)}
+// The action button says exactly what it will do in this spot: ENTER HOME,
+// ENTER CAFE, RIDE BIKE, GET IN CAR, TAKE CAR, EXIT BIKE — never a bare "USE".
+const PLACE_VERB={home:'ENTER HOME',hub:'USE HUB',cafe:'ENTER CAFE',apartment:'ENTER FLATS',diner:'ENTER DINER',garage:'VISIT MOTORS',clinic:'ENTER CLINIC',club:'ENTER LOUNGE',office:'ENTER TOWER',friend:'ENTER HOUSE',shop:'OPEN SHOP',market:'ENTER MARKET',gym:'ENTER GYM',mosque:'ENTER MOSQUE',fishmarket:'ENTER MARKET',casino:'ENTER CASINO',warehouse:'ENTER DOCK 9',hotel:'ENTER HOTEL',lodge:'ENTER LODGE',church:'ENTER CHURCH',campdiner:'ENTER DINER'};
+function placeVerb(place){return PLACE_VERB[place?.id]||`ENTER ${(place?.name||'').split(' ').pop()||'PLACE'}`}
 function nearestPlace(){
  if(insideHome||vehicle)return null;let closest=null,best=4.4;
  for(const place of LANDMARKS){const p=entrance(place),d=Math.hypot(player.position.x-p.x,player.position.z-p.z);if(d<best){closest=place;best=d}}
@@ -391,7 +422,7 @@ function drivingObstacles(){
 }
 function walkingObstacles(){const p=player.position,near=[];for(const v of [...vehicles,...traffic.map(t=>t.car)]){const q=v.mesh.position;if(Math.abs(q.x-p.x)>10||Math.abs(q.z-p.z)>10)continue;const angle=v.mesh.rotation.y,w=v.type==='bike'?.55:1.3,d=v.type==='bike'?1.5:2.35,c=Math.abs(Math.cos(angle)),n=Math.abs(Math.sin(angle));near.push({x:q.x,z:q.z,halfX:w*c+d*n,halfZ:w*n+d*c})}for(const c of civilians){const q=c.mesh.position;if(Math.abs(q.x-p.x)<4&&Math.abs(q.z-p.z)<4)near.push({x:q.x,z:q.z,halfX:.35,halfZ:.35})}return [...world.blocks,...world.obstacles,...near].filter(b=>!blocked(p.x,p.z,[b],.2))}
 function moveInsideHome(dx,dz){return moveInside(player.position,dx,dz,interiorPlace.id)}
-function enterPlace(place){sound('success');resetInputs();insideHome=true;interiorPlace=place;homeInterior.visible=place.id==='home';if(interiors[place.id])interiors[place.id].visible=true;for(const attendant of interiorCrowd(place.id))if(!attendant.requested){attendant.requested=true;attendant.mesh.visible=true;models.person(attendant.mesh,attendant.role)}marker.visible=false;player.position.set(HOME_CENTER.x,0,HOME_CENTER.z+(place.id==='home'?0:3));camera.position.set(0,4,HOME_CENTER.z+6);cameraYaw=0;aiming=false;updateAimButton();showToast(`${place.name} · TAP USE FOR OPTIONS`)}
+function enterPlace(place){sound('success');resetInputs();insideHome=true;interiorPlace=place;homeInterior.visible=place.id==='home';if(interiors[place.id])interiors[place.id].visible=true;for(const attendant of interiorCrowd(place.id))if(!attendant.requested){attendant.requested=true;attendant.mesh.visible=true;models.person(attendant.mesh,attendant.role)}marker.visible=false;player.position.set(HOME_CENTER.x,0,HOME_CENTER.z+(place.id==='home'?0:3));camera.position.set(0,4,HOME_CENTER.z+6);cameraYaw=0;aiming=false;updateAimButton();showToast(`${place.name} · TAP OPTIONS`)}
 function exitHome(travel=false){sound('reload');resetInputs();insideHome=false;homeInterior.visible=false;for(const room of Object.values(interiors))room.visible=false;marker.visible=true;const p=travel?selectedDistrict:entrance(interiorPlace);player.position.set(p.x,0,p.z);cameraYaw=travel?(p.x<0?Math.PI/2:-Math.PI/2):-Math.PI/2;player.rotation.y=cameraYaw;camera.position.set(p.x+Math.sin(cameraYaw)*7,4.5,p.z+Math.cos(cameraYaw)*7);routeTarget=null;if(!missionActive){if(travel){target=entrance(LANDMARKS.find(x=>x.id==='hub'));setObjective('FREE ROAM','Visit the mission hub to start a job.',1)}else setObjective('FREE ROAM','Explore the city or visit the mission hub.',1)}showToast(travel?`ARRIVED · ${selectedDistrict.name}`:missionActive?'RETURN TO YOUR MISSION':interiorPlace.id!=='home'?`LEFT ${interiorPlace.name} · FOLLOW YOUR GPS`:selectedDistrict.id==='city'?'FOLLOW THE MARKER TO THE MISSION HUB':`FOLLOW THE MARKER TO ${selectedDistrict.name}`)}
 function closePlace(){placeOpen=false;$('place-overlay').hidden=true}
 function placeButton(label,callback){const button=document.createElement('button');button.className='place-action';button.textContent=label;button.onclick=callback;$('place-actions').appendChild(button)}
@@ -432,7 +463,7 @@ function openPlace(place){
 }
 // --- Money, shopping and the garage ---
 function payFor(cost){if(progress.money<cost){showToast('NOT ENOUGH CASH');sound('reload');return false}progress.money-=cost;refreshCash();sound('success');return true}
-function saveGarage(){try{window.localStorage?.setItem('aivm-garage',JSON.stringify(ownedVehicles))}catch{}}
+function saveGarage(){try{storage?.setItem(garageKey(),JSON.stringify(ownedVehicles))}catch{}}
 // A bought vehicle is parked at the door you walked out of, and stays in the
 // city like any other ride (so it can be driven, or stolen back).
 function spawnOwnedVehicle(id,at){
@@ -517,19 +548,20 @@ function spawnPoliceCar(pos){
 }
 function bustPlayer(){
  if(busted)return;busted=true;
+ if(race)disqualifyRace();
  const lost=Math.min(progress.money,120);progress.money-=lost;refreshCash();
  heat=0;updateHeat();clearPolice();
  if(vehicle){vehicle.occupied=false;if(vehicle.rider)vehicle.rider.visible=false;vehicle=null;vehicleSpeed=0;engineAudio.stop();engineAudio.stop()}
  player.visible=true;health=100;lastSeenByPolice=gameTime;
  player.position.set(JAIL.x,0,JAIL.z);cameraYaw=Math.PI;player.rotation.y=cameraYaw;
  camera.position.set(JAIL.x,3.2,JAIL.z+6.4);
- jailedUntil=gameTime+25;resetInputs();sound('reload');
+ jailedUntil=gameTime+25;jailRealUntil=performance.now()+25000;resetInputs();sound('reload');
  $('jail-overlay').hidden=false;$('jail-text').textContent=`The cops booked you at the Palm Grove hold. -$${lost} in fines. Wait it out or pay bail.`;
  showToast(`BUSTED · LOCKED UP · -$${lost}`);
  busted=false;
 }
 function releaseFromJail(bail){
- jailedUntil=0;$('jail-overlay').hidden=true;
+ jailedUntil=0;jailRealUntil=0;$('jail-overlay').hidden=true;if(gameMenuOpen)closeGameMenu();
  const clinic=landmarkById('clinic')||LANDMARKS[0],door=entrance(clinic);
  player.position.set(door.x,0,door.z);cameraYaw=-Math.PI/2;resetInputs();
  showToast(bail?'BAIL PAID · YOU WALK FREE':'TIME SERVED · YOU WALK FREE');
@@ -786,7 +818,7 @@ function updateEnemies(dt){
  e.cooldown-=dt;if(d<25&&e.cooldown<=0&&hasLineOfSight(e.mesh.position,pos,world.blocks)){e.cooldown=1.7+Math.random();e.shootUntil=gameTime+.35;hit(vehicle?3:5);addTracer(e.mesh.position.clone().add(new THREE.Vector3(0,2,0)),pos.clone().add(new THREE.Vector3(0,1.5,0)),0xff866d)}
  }
 }
-let jailedUntil=0,shakeUntil=0,currentSway=0;
+let jailedUntil=0,jailRealUntil=0,shakeUntil=0,currentSway=0;
 function updateHostileCivilians(dt){
  const pos=vehicle?vehicle.mesh.position:player.position;
  for(const c of civilians){
@@ -840,9 +872,20 @@ function openGameMenu(){if(ended||mapOpen||settingsOpen||placeOpen||districtOpen
 $('game-menu-close').onclick=closeGameMenu;$('game-menu-button').onclick=openGameMenu;$('menu-activities').onclick=openGameMenu;document.querySelector('.status')?.addEventListener('click',()=>{if(started&&!ended&&vehicle&&!mapOpen&&!settingsOpen&&!placeOpen)cycleRadio()});
 $('talk-btn').onclick=()=>{const person=nearestPerson();if(person)openStreetConversation(person);else if(insideHome&&interiorCrowd(interiorPlace.id).length)openConversation(true);else showToast('NOBODY CLOSE ENOUGH TO TALK TO')};
 $('settings-button').onclick=()=>setSettings(!settingsOpen);$('menu-settings').onclick=()=>setSettings(true);$('close-settings').onclick=()=>setSettings(false);
-$('start').onclick=()=>{started=true;$('intro').classList.add('hidden');homeInterior.visible=true;player.position.set(HOME_CENTER.x,0,HOME_CENTER.z);camera.position.set(0,4,HOME_CENTER.z+7);marker.visible=false;setObjective('AT HOME',selectedDistrict.id==='city'?'Rest here or exit and visit the mission hub.':`Rest here or travel to ${selectedDistrict.name}.`,1);try{audio=new (window.AudioContext||window.webkitAudioContext)();audio.resume();prepareAudio();music=createMusic(audio);
-  (async()=>{for(const [track,file] of [['coast','vocal-coast'],['night','vocal-night']]){try{const r=await fetch(`${import.meta.env.BASE_URL}assets/audio/${file}.mp3`);if(r.ok&&music)setVocalSafe(track,await audio.decodeAudioData(await r.arrayBuffer()))}catch{}}})()}catch{}showToast('YOUR HOME · TAP USE TO REST OR LEAVE')};
+$('start').onclick=()=>{started=true;$('intro').classList.add('hidden');homeInterior.visible=true;player.position.set(HOME_CENTER.x,0,HOME_CENTER.z);camera.position.set(0,4,HOME_CENTER.z+7);marker.visible=false;const snap=loadResume();if(snap){player.position.set(snap.x,0,snap.z);cameraYaw=snap.yaw||0;player.rotation.y=cameraYaw;camera.position.set(snap.x,4,snap.z+7);health=Math.max(1,Math.min(100,snap.health||100));heat=Math.max(0,Math.min(3,snap.heat||0));updateHeat();if(Number.isInteger(snap.weaponIndex)&&snap.weaponIndex>=0&&snap.weaponIndex<weapons.length){weaponIndex=snap.weaponIndex;updateWeapon(player,weaponIndex)}if(Array.isArray(snap.ammo))snap.ammo.forEach((n,i)=>{if(i<ammo.length&&Number.isFinite(n))ammo[i]=Math.max(0,Math.round(n))})}setObjective(snap?'WELCOME BACK':'AT HOME',snap?'You resumed where you left off — cash, gear and spot in the city.':(selectedDistrict.id==='city'?'Rest here or exit and visit the mission hub.':`Rest here or travel to ${selectedDistrict.name}.`),1);try{audio=new (window.AudioContext||window.webkitAudioContext)();audio.resume();prepareAudio();music=createMusic(audio);
+  (async()=>{for(const [track,file] of [['coast','vocal-coast'],['night','vocal-night']]){try{const r=await fetch(`${import.meta.env.BASE_URL}assets/audio/${file}.mp3`);if(r.ok&&music)setVocalSafe(track,await audio.decodeAudioData(await r.arrayBuffer()))}catch{}}})()}catch{}showToast(snap?'WELCOME BACK · YOU RESUMED WHERE YOU LEFT OFF':'YOUR HOME · TAP OPTIONS TO REST OR LEAVE')};
 $('jail-bail').onclick=()=>{if(payFor(150))releaseFromJail(true)};
+// Accounts: create / sign in / sign out. Progress and garage are namespaced
+// per account (see accounts.js), so each player resumes their own save.
+function currentAccount(){return getSessionAccount(storage)}
+function updateAccountUI(){const account=currentAccount();$('account-state').textContent=account?account.email.toUpperCase():'SIGN IN ↗';$('account-form').hidden=!!account;$('account-signed').hidden=!account;$('account-title').innerHTML=account?'WELCOME <span>BACK.</span>':'SIGN <span>IN.</span>';if(account)$('account-email-display').textContent=account.email}
+function applyAccountData(){if(started)saveResume();const account=currentAccount();accountScope=account?account.id:null;setProgressScope(accountScope);Object.assign(progress,loadProgress(storage));ownedVehicles=[];loadGarage();lastOwnedVehicle=null;refreshCash()}
+$('menu-account').onclick=()=>{$('account-msg').textContent='';$('account-email').value='';$('account-password').value='';updateAccountUI();$('account-screen').classList.remove('hidden');sound('reload')};
+$('account-close').onclick=()=>{$('account-screen').classList.add('hidden');sound('reload')};
+$('account-form').onsubmit=async event=>{event.preventDefault();const email=$('account-email').value,password=$('account-password').value;$('account-msg').textContent='CHECKING…';const result=await signInAccount(storage,email,password);if(!result.ok){$('account-msg').textContent=result.error;sound('fail');return}$('account-msg').textContent='';applyAccountData();updateAccountUI();$('account-screen').classList.add('hidden');showToast(`WELCOME BACK ${result.account.email.toUpperCase()} · RESUMING WHERE YOU LEFT OFF`);sound('success')};
+$('account-create').onclick=async()=>{const email=$('account-email').value,password=$('account-password').value;$('account-msg').textContent='CREATING…';const result=await registerAccount(storage,email,password);if(!result.ok){$('account-msg').textContent=result.error;sound('fail');return}$('account-msg').textContent='';applyAccountData();saveProgress(storage,progress);updateAccountUI();$('account-screen').classList.add('hidden');showToast(`ACCOUNT CREATED · A FRESH LIFE IN PALM GROVE, ${result.account.email.toUpperCase()}`);sound('success')};
+$('account-signout').onclick=()=>{saveProgress(storage,progress);saveGarage();if(started)saveResume();signOut(storage);applyAccountData();updateAccountUI();showToast('SIGNED OUT · BACK TO THE GUEST SAVE');sound('reload')};
+updateAccountUI();
 $('scope-zoom-in').onclick=()=>{scopeZoom=Math.min(2,scopeZoom+1);updateScopeInfo()};
 $('scope-zoom-out').onclick=()=>{scopeZoom=Math.max(0,scopeZoom-1);updateScopeInfo()};
 $('scope-breath').onclick=()=>{breathUntil=gameTime+2.6;showToast('BREATH HELD · SCOPE STEADY')};
@@ -1322,10 +1365,14 @@ function leaveRace(){
   openGameMenu();
 }
 
+window.addEventListener('pagehide',()=>{if(started&&!ended&&!insideHome)saveResume()});
 const clock=new THREE.Clock();let mapTick=0;
-function animate(){requestAnimationFrame(animate);const elapsed=clock.getDelta(),dt=Math.min(elapsed,.05);if(music)music.update(race?.status==='running'||missionActive?'race':musicTrack,musicVolume,muted||document.hidden);updateRaceWorld(dt);updateBubbles();if(mapOpen||settingsOpen||placeOpen||editingLayout||districtOpen||arcadeOpen||casinoOpen||gameMenuOpen||raceOpen)return;
+function animate(){requestAnimationFrame(animate);const elapsed=clock.getDelta(),dt=Math.min(elapsed,.05);
+ // The jail clock runs on real time and before every pause gate, so opening a
+ // menu, pausing or backgrounding the tab can never trap the player in the cell.
+ if(jailedUntil>0){const left=(jailRealUntil-performance.now())/1000;if(left>0){$('jail-count').textContent=`RELEASE IN ${Math.ceil(left)}s`;joy.x=0;joy.y=0}else if(!$('jail-overlay').hidden)releaseFromJail(false)}if(music)music.update(race?.status==='running'||missionActive?'race':musicTrack,musicVolume,muted||document.hidden);updateRaceWorld(dt);updateBubbles();if(mapOpen||settingsOpen||placeOpen||editingLayout||districtOpen||arcadeOpen||casinoOpen||gameMenuOpen||raceOpen)return;
  if(started&&!ended){gameTime+=Math.min(elapsed,.25);
-  if(jailedUntil>gameTime){$('jail-count').textContent=`RELEASE IN ${Math.ceil(jailedUntil-gameTime)}s`;joy.x=0;joy.y=0}
+  if(jailedUntil<=gameTime&&!insideHome&&gameTime-lastResumeSave>10){lastResumeSave=gameTime;saveResume()}
   let inputX=(jailedUntil>gameTime?0:joy.x)+(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0),inputZ=(jailedUntil>gameTime?0:joy.y)+(keys.KeyS||keys.ArrowDown?1:0)-(keys.KeyW||keys.ArrowUp?1:0);const len=Math.hypot(inputX,inputZ);if(len>1){inputX/=len;inputZ/=len}
   if(vehicle){
    engineAudio.update(vehicleSpeed,(gasHeld?1:0)-(brakeHeld?1:0),vehicle.type);
@@ -1371,7 +1418,7 @@ function animate(){requestAnimationFrame(animate);const elapsed=clock.getDelta()
   }if(player.userData.model?.userData.gun)player.userData.model.userData.gun.visible=!insideHome;if(aiming&&!vehicle)player.rotation.y=cameraYaw;if(fireHeld&&!insideHome)shoot();if(reloadEnd&&gameTime>=reloadEnd){ammo[weaponIndex]=weapons[weaponIndex].cap;reloadEnd=0}if(!insideHome)updateEnemies(dt);if(!ended&&!insideHome&&missionActive){if(activity)updateSideActivity(Math.min(elapsed,.25));else updateMission();}if(!ended&&!insideHome)updateNavigation();if(!ended&&!insideHome)updateRival(dt);if(!ended){const cityPos=vehicle?vehicle.mesh.position:player.position;updateCity(dt,cityPos);updateAnimals(dt,cityPos);if(!insideHome)updatePolice(dt,cityPos);}if(!ended&&!insideHome&&missionActive&&!activity&&mission===2&&gameTime-lastReinforcement>16&&enemies.filter(e=>e.alive&&e.kind==='pursuer').length<5){const p=vehicle?vehicle.mesh.position:player.position;const z=Math.round(p.z/28)*28;const x=Math.max(-84,Math.min(84,Math.round(p.x/28)*28+(p.x<target.x?-28:28)));spawnEnemy(x,z,'pursuer');lastReinforcement=gameTime;showToast('ENEMY REINFORCEMENTS INBOUND')}
   for(let i=shots.length-1;i>=0;i--)if(shots[i].until<gameTime){scene.remove(shots[i].line);shots[i].line.geometry.dispose();shots[i].line.material.dispose();shots.splice(i,1)}
   $('hud').classList.toggle('driving',!!vehicle);$('hud').classList.toggle('at-home',insideHome);$('health').textContent=Math.ceil(health);$('health-fill').style.width=Math.max(0,Math.min(100,health))+'%';$('health-fill').style.background=health<30?'#ff6b59':'#c9fc51';$('weapon').textContent=vehicle?`${vehicle.brand||'VEHICLE'} ${vehicle.model||''}`.trim():weapons[weaponIndex].name;$('weapon-sub').textContent=vehicle?`${Math.round(Math.abs(vehicleSpeed)*5)} KM/H · TAP RADIO`:reloadEnd?'RELOADING...':aimAssist?'AIM ASSIST ON':'MANUAL AIM';$('ammo').innerHTML=vehicle?'—':`${ammo[weaponIndex]} <small>/ ∞</small>`;const reloading=!!reloadEnd&&!vehicle;$('reload-track').classList.toggle('visible',reloading);const reloadProgress=reloading?Math.round(Math.max(0,Math.min(1,1-(reloadEnd-gameTime)))*100):0;$('reload-fill').style.width=reloadProgress+'%';$('reload-track').setAttribute('aria-valuenow',String(reloadProgress));$('reload-btn').classList.toggle('selected',reloading);
-  const place=insideHome?interiorPlace:nearestPlace(),trafficNear=!insideHome&&!vehicle&&!place?nearestTrafficCar():null,parkedDistance=vehicles.reduce((best,v)=>Math.min(best,player.position.distanceTo(v.mesh.position)),5),hijack=trafficNear&&player.position.distanceTo(trafficNear.car.mesh.position)<parkedDistance;const near=insideHome||vehicle||place||parkedDistance<5||trafficNear;$('interact-btn').style.display=near?'':'none';$('interact-btn').querySelector('.lbl').textContent=vehicle?'EXIT':place?'USE':hijack?'TAKE':'RIDE';$('interact-btn').setAttribute('aria-label',vehicle?'Exit vehicle':place?`Use ${place.name}`:hijack?'Pull driver out and take car':'Enter nearby vehicle');$('interaction').style.display=place&&!vehicle?'block':'none';$('interaction').textContent=insideHome?`${interiorPlace.name} · TAP USE FOR OPTIONS OR EXIT`:place?`${place.name} · TAP USE`:'';$('navigation').style.display=insideHome?'none':'';$('talk-btn').style.display=nearestPerson()&&!place?'':'none';
+  const place=insideHome?interiorPlace:nearestPlace(),trafficNear=!insideHome&&!vehicle&&!place?nearestTrafficCar():null;let nearV=null,parkedDistance=5;for(const v of vehicles){const d=player.position.distanceTo(v.mesh.position);if(d<parkedDistance){parkedDistance=d;nearV=v}}const hijack=trafficNear&&player.position.distanceTo(trafficNear.car.mesh.position)<parkedDistance;const near=insideHome||vehicle||place||parkedDistance<5||trafficNear;$('interact-btn').style.display=near?'':'none';const interactVerb=vehicle?(vehicle.type==='bike'?'EXIT BIKE':'EXIT CAR'):insideHome?'OPTIONS':place?placeVerb(place):hijack?'TAKE CAR':nearV?.type==='bike'?'RIDE BIKE':'GET IN CAR';$('interact-btn').querySelector('.lbl').textContent=interactVerb;$('interact-btn').setAttribute('aria-label',vehicle?`Exit the ${vehicle.type}`:insideHome?`${interiorPlace.name} options`:place?`${interactVerb} — ${place.name}`:hijack?'Pull the driver out and take the car':nearV?`Get in the ${nearV.type}`:'Enter the nearby vehicle');$('interaction').style.display=place&&!vehicle?'block':'none';$('interaction').textContent=insideHome?`${interiorPlace.name} · TAP OPTIONS OR EXIT`:place?`${place.name} · TAP ${interactVerb}`:'';$('navigation').style.display=insideHome?'none':'';$('talk-btn').style.display=nearestPerson()&&!place?'':'none';
   const locked=!insideHome&&!vehicle&&nearestAnyTarget();$('crosshair').classList.toggle('locked',!!locked);$('target-name').textContent=locked?'TARGET LOCKED':'';
   if((mapTick+=dt)>.1){updateMap();mapTick=0}
   // People nearby turn to look at you, and whoever you are talking to keeps
@@ -1404,10 +1451,13 @@ if(import.meta.env.DEV) window.__aivmTest={
   vocalState(){return music?.vocalState?.()??null},
   startSniper(){startSniperContract()},
   killTarget(){const tget=sniperSpawns.find(e=>e.alive);if(tget)damageEnemy(tget,999)},
-  jailState(){return {jailed:jailedUntil>gameTime,left:+Math.max(0,jailedUntil-gameTime).toFixed(1)}},
+  jailState(){return {jailed:jailedUntil>0,left:+Math.max(0,(jailRealUntil-performance.now())/1000).toFixed(1)}},
+  resumeNow(){saveResume();return loadResume()},
+  interactLabel(){return $('interact-btn').querySelector('.lbl').textContent},
   forceBust(){bustPlayer()},
   hostileCount(){return civilians.filter(c=>c.hostileUntil>gameTime&&!c.dead).length},
   arcadeAward(){return arcadeAwardLog.slice()},
+  grantReward(cash,label){reward(progress,cash);saveProgress(storage,progress);refreshCash();arcadeAwardLog.push({cash,label});return progress.money},
   trafficStatus(){return traffic.map(t=>({type:t.car.type,x:t.car.mesh.position.x,z:t.car.mesh.position.z}))},
   health(value){health=value},
   yaw(value){cameraYaw=value;player.rotation.y=value;camera.position.set(player.position.x+Math.sin(value)*6.7,3.35,player.position.z+Math.cos(value)*6.7)},
