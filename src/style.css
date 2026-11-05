@@ -273,3 +273,15 @@
 
 /* Nitro countdown chip (wave 12) */
 .nitro-chip{position:absolute;top:60px;left:50%;transform:translateX(-50%);background:#ff9d4f;color:#241105;font-weight:800;letter-spacing:.06em;padding:4px 14px;border-radius:999px;font-size:12px;z-index:40;box-shadow:0 2px 10px rgba(0,0,0,.35);pointer-events:none}
+
+/* Wave 13 — zoomable maps: minimap zoom chip and full-map zoom UI. */
+.map-stack{position:relative}
+.mini-zoom-row{display:flex;justify-content:center;margin-top:-11px;position:relative;z-index:3;pointer-events:none}
+.mini-zoom{pointer-events:auto;background:#10211eee;border:1px solid #9ad7c8;border-radius:999px;padding:3px 8px;font:800 9px Inter,sans-serif;color:#e6fff7;letter-spacing:.05em;touch-action:manipulation;white-space:nowrap}
+.mini-zoom:active{background:#2c4a3c}
+.map-zoom-ui{position:absolute;right:8px;top:8px;display:flex;align-items:center;gap:6px;line-height:1}
+.map-zoom-ui button{width:34px;height:34px;background:#16281fdd;border:1px solid #a9b99b;color:#eafff2;font:800 16px Inter,sans-serif;border-radius:4px;touch-action:manipulation}
+.map-zoom-ui button:active{background:#2c4a3c}
+.map-zoom-ui #map-follow{width:auto;padding:0 10px;font-size:11px;font-weight:800}
+#map-zoom-level{min-width:38px;text-align:center;color:#eafff2;font:800 11px Inter,sans-serif;text-shadow:0 1px 3px #000}
+.full-map-wrap canvas{touch-action:none;cursor:grab}

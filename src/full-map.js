@@ -1,19 +1,48 @@
 import { CITY_BOUND, ROAD_LIMIT, LANDMARKS, DISTRICTS, entrance, mapLetter, DISTRICT_LETTERS } from './city-data.js';
-// The playable city is bounded by -100..100 in both world axes. Keep the full
-// map north-up, with a small margin around those bounds for symbols and labels.
+// The playable city is bounded by -100..100 in world axes on the old core and
+// -156..156 overall. Keep the full map north-up (unless heading-up is on),
+// with a small margin around those bounds for symbols and labels.
 export const MAP_BOUND = CITY_BOUND + 5;
 export function worldToMap(x, z, size, bound = MAP_BOUND) {
   return { x: (x + bound) * size / (bound * 2), y: (z + bound) * size / (bound * 2) };
 }
 
-export function drawFullMap(canvas, { blocks, position, target, route, enemies, vehicles, cameraYaw, headingUp = false, pickups = [] }) {
-  const ctx = canvas.getContext('2d'), size = canvas.width, scale = size / (MAP_BOUND * 2);
-  const point = p => worldToMap(p.x, p.z, size);
+// --- Zoom & pan view ---------------------------------------------------------
+// `view` is {zoom, cx, cz}: zoom 1 shows the whole city, cx/cz are the world
+// coordinates at the centre of the canvas. The view is clamped so the map can
+// never be dragged past the city edge into empty space.
+export const MAP_MIN_ZOOM = 1, MAP_MAX_ZOOM = 5;
+export function clampMapView(view = {}) {
+  const zoom = Math.min(MAP_MAX_ZOOM, Math.max(MAP_MIN_ZOOM, Number(view.zoom) || 1));
+  const lim = MAP_BOUND * (1 - 1 / zoom);
+  const clamp = value => Math.max(-lim, Math.min(lim, Number(value) || 0)) + 0; // +0 normalises -0
+  return { zoom, cx: clamp(view.cx), cz: clamp(view.cz) };
+}
+export function mapScale(view, size) {
+  return size / (MAP_BOUND * 2) * ((view && view.zoom) || 1);
+}
+export function screenToWorld(view, sx, sy, size) {
+  const v = clampMapView(view), scale = mapScale(v, size);
+  return { x: (sx - size / 2) / scale + v.cx, z: (sy - size / 2) / scale + v.cz };
+}
+// Zoom by `factor` keeping the world point under the anchor pixel stationary.
+export function zoomMapView(view, factor, anchorX, anchorY, size) {
+  const v = clampMapView(view);
+  if (!(factor > 0)) return v;
+  const before = screenToWorld(v, anchorX, anchorY, size);
+  const next = clampMapView({ ...v, zoom: v.zoom * factor });
+  const after = screenToWorld(next, anchorX, anchorY, size);
+  return clampMapView({ ...next, cx: next.cx + (before.x - after.x), cz: next.cz + (before.z - after.z) });
+}
+
+export function drawFullMap(canvas, { blocks, position, target, route, enemies, vehicles, cameraYaw, headingUp = false, pickups = [], view }) {
+  const ctx = canvas.getContext('2d'), size = canvas.width, v = clampMapView(view), scale = mapScale(v, size);
+  const point = p => ({ x: (p.x - v.cx) * scale + size / 2, y: (p.z - v.cz) * scale + size / 2 });
   ctx.clearRect(0, 0, size, size);
   ctx.fillStyle = '#314640'; ctx.fillRect(0, 0, size, size);
   if (headingUp) { const pp = point(position); ctx.save(); ctx.translate(pp.x, pp.y); ctx.rotate(cameraYaw); ctx.translate(-pp.x, -pp.y); }
   // District backgrounds follow the actual north/south division in world.js.
-  const band = (top, bottom, color) => { ctx.fillStyle = color; ctx.fillRect(0, point({x:0,z:top}).y, size, (bottom-top)*scale); };
+  const band = (top, bottom, color) => { ctx.fillStyle = color; ctx.fillRect(0, point({x:0,z:top}).y, size, (bottom-top)*scale); }
   band(-MAP_BOUND, MAP_BOUND, '#777d67');
   const districtRect=(x1,z1,x2,z2,color)=>{const a=point({x:x1,z:z1}),b=point({x:x2,z:z2});ctx.fillStyle=color;ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y)};
   districtRect(-MAP_BOUND,-MAP_BOUND,-56,0,'#3f6c78');districtRect(56,-MAP_BOUND,MAP_BOUND,0,'#618465');
@@ -39,15 +68,21 @@ export function drawFullMap(canvas, { blocks, position, target, route, enemies, 
     const p = point(entrance(place)); ctx.beginPath(); ctx.arc(p.x,p.y,12,0,Math.PI*2);
     ctx.fillStyle=place.color;ctx.fill();ctx.strokeStyle='#182925';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#122b25';ctx.font='bold 15px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(mapLetter(place),p.x,p.y+1);
   }
+  // Zoomed in far enough, spell out what every pin and district blob is.
+  if (v.zoom >= 1.7) {
+    ctx.font = 'bold 10px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+    for (const district of DISTRICTS) { const p = point(district); ctx.strokeStyle = '#10201b'; ctx.strokeText(district.name, p.x, p.y - 22); ctx.fillStyle = '#f2fff8'; ctx.fillText(district.name, p.x, p.y - 22); }
+    for (const place of LANDMARKS) { const p = point(entrance(place)); ctx.strokeStyle = '#10201b'; ctx.strokeText(place.name, p.x, p.y + 23); ctx.fillStyle = '#f2fff8'; ctx.fillText(place.name, p.x, p.y + 23); }
+  }
   if (route.length > 1) {
     ctx.lineWidth = 8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     ctx.strokeStyle = '#1b2921'; ctx.beginPath();
-    route.forEach((p,i) => {const v=point(p); if(i===0)ctx.moveTo(v.x,v.y);else ctx.lineTo(v.x,v.y)}); ctx.stroke();
+    route.forEach((p,i) => {const v2=point(p); if(i===0)ctx.moveTo(v2.x,v2.y);else ctx.lineTo(v2.x,v2.y)}); ctx.stroke();
     ctx.strokeStyle = '#c9fc51'; ctx.lineWidth = 5; ctx.stroke();
   }
   // Parked and occupied rideable vehicles, live enemies and the current objective.
-  for (const v of vehicles) {
-    const p = point(v.mesh.position); ctx.fillStyle = '#72cbeb'; ctx.fillRect(p.x-6,p.y-6,12,12);
+  for (const veh of vehicles) {
+    const p = point(veh.mesh.position); ctx.fillStyle = '#72cbeb'; ctx.fillRect(p.x-6,p.y-6,12,12);
   }
   // Floating street gifts, coloured by what they give.
   for (const gift of pickups) {
