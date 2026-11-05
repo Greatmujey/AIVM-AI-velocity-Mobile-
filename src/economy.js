@@ -7,7 +7,7 @@ export function loadProgress(storage) {
   try {
     const data = JSON.parse(storage?.getItem(KEY) || '{}');
     return { money: Number.isSafeInteger(data.money) && data.money >= 0 ? Math.min(data.money, 9999999) : 0,
-      owned: Array.isArray(data.owned) ? data.owned.filter(x => Object.hasOwn(PRICES, x)) : [] };
+      owned: Array.isArray(data.owned) ? data.owned.filter(x => Object.hasOwn(PRICES, x)) : [], ...(Number.isSafeInteger(data.cents) && data.cents > 0 && data.cents < 100 ? {cents:data.cents} : {}) };
   } catch { return {money:0,owned:[]}; }
 }
 export function saveProgress(storage, progress) {

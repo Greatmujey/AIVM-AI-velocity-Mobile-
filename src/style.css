@@ -308,3 +308,6 @@
 .mini-zoom-row{gap:4px;align-items:center}
 .mini-zoom-step{width:24px;height:22px;padding:0;background:#102924f0;border:1px solid #9ad7c89c;border-radius:12px;color:#e6fff7;font:800 13px/1 Inter,sans-serif;pointer-events:auto;touch-action:manipulation}
 .mini-zoom-step:focus-visible{outline:2px solid white;outline-offset:2px}
+
+/* Teleport portal: a full-screen fade used while you are in transit. */
+#teleport-fade{position:fixed;inset:0;background:#02030a;opacity:0;pointer-events:none;z-index:80}

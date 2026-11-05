@@ -24,6 +24,7 @@ import { RACE_CLASSES, tracksForClass, classOfTrack, normalizeRaceClass, default
 import { advanceBot, botCheckpointReached } from './race-ai.js';
 import { SIDE_MISSIONS, SIDE_MISSION_IDS, createSideMission, sideMissionTarget, sideMissionObjective, sideMissionCounter, advanceSideMission, advanceChase, chaseCaught } from './missions.js';
 import { createRaceUI } from './race-ui.js';
+import { destinationList, formatFare, fareCents, teleportPhase, portalFront, applyFare, balanceCents, EXIT_OFFSET, fadeLevel } from './teleport.js';
 import { createHitFx, fallYawFrom, createSiren } from './fx.js';
 import { createArrest, arrestStep, ARREST } from './arrest.js';
 import { CONTRACTS, contractById, createContract, registerContractKill, contractObjective, contractCard } from './contracts.js';
@@ -39,7 +40,7 @@ import './style.css';
 document.querySelector('#app').innerHTML = `
 <canvas id="game" aria-label="3D game view. Drag to look around."></canvas><div class="vignette"></div><div class="damage" id="damage"></div>
 <div class="hud" id="hud">
- <div class="top"><div><div class="brand"><img class="brand-logo" src="${import.meta.env.BASE_URL}assets/logo.png" alt="AIVM — AI Velocity Mobile"></div><div class="mission"><div class="eyebrow" id="mission-number">MISSION 01 / 03</div><h2 id="mission-title">FIRST DELIVERY</h2><p id="objective">Take the bike and pick up the package.</p><div class="count" id="mission-count"></div></div></div><div class="right-hud"><div class="cash-display" id="cash-display">$0</div><div class="heat"><small>HEAT</small><strong id="heat">☆☆☆</strong></div><div class="map-stack"><button class="map-wrap" id="open-map" aria-label="Open full city map" aria-haspopup="dialog"><canvas id="map" width="200" height="200"></canvas><span class="map-label" id="map-orient">HEAD ↑</span><span class="map-tap">TAP MAP</span></button><div class="mini-zoom-row"><button class="mini-zoom-step" id="mini-out" aria-label="Zoom minimap out">−</button><button class="mini-zoom" id="mini-zoom" aria-label="Cycle minimap zoom">🔍 1×</button><button class="mini-zoom-step" id="mini-in" aria-label="Zoom minimap in">+</button></div><div class="map-note">● YOU &nbsp; ◆ GOAL &nbsp; — GPS</div><button class="settings-button" id="game-menu-button" aria-haspopup="dialog">☰ GAME MENU</button><button class="settings-button" id="settings-button" aria-expanded="false" aria-controls="settings-panel">⚙ SETTINGS</button></div></div></div>
+ <div class="top"><div><div class="brand"><img class="brand-logo" src="${import.meta.env.BASE_URL}assets/logo.png" alt="AIVM — AI Velocity Mobile"></div><div class="mission"><div class="eyebrow" id="mission-number">MISSION 01 / 03</div><h2 id="mission-title">FIRST DELIVERY</h2><p id="objective">Take the bike and pick up the package.</p><div class="count" id="mission-count"></div></div></div><div class="right-hud"><div class="cash-display" id="cash-display">$0</div><div class="heat"><small>HEAT</small><strong id="heat">☆☆☆</strong></div><div class="map-stack"><button class="map-wrap" id="open-map" aria-label="Open full city map" aria-haspopup="dialog"><canvas id="map" width="200" height="200"></canvas><span class="map-label" id="map-orient">HEAD ↑</span><span class="map-tap">TAP MAP</span></button><div class="mini-zoom-row"><button class="mini-zoom-step" id="mini-out" aria-label="Zoom minimap out">−</button><button class="mini-zoom" id="mini-zoom" aria-label="Cycle minimap zoom">🔍 1×</button><button class="mini-zoom-step" id="mini-in" aria-label="Zoom minimap in">+</button></div><div class="map-note">● YOU &nbsp; ◆ GOAL &nbsp; — GPS</div><button class="settings-button" id="game-menu-button" aria-haspopup="dialog">☰ GAME MENU</button><button class="settings-button" id="teleport-button" aria-haspopup="dialog" aria-label="Teleport through a portal">🌀 TELEPORT</button><button class="settings-button" id="settings-button" aria-expanded="false" aria-controls="settings-panel">⚙ SETTINGS</button></div></div></div>
  <div class="navigation" id="navigation"><span id="direction-arrow">▲</span><span id="distance">0 M</span><small>OBJECTIVE</small></div><div class="crosshair" id="crosshair"><i></i><i></i><i></i><i></i></div><div class="target-name" id="target-name"></div><div class="hitmarker" id="hitmarker">×</div>
  <div class="bottom-left"><div class="status"><div class="status-top"><span class="status-label">HEALTH</span><span class="health-num" id="health">100</span></div><div class="health-track"><div class="health-fill" id="health-fill"></div></div><div class="weapon-name" id="weapon">PISTOL</div><div class="weapon-sub" id="weapon-sub">AIM ASSIST ON</div><div class="reload-track" id="reload-track" role="progressbar" aria-label="Reload progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="reload-fill"></div></div></div><div class="ammo" id="ammo">12 <small>/ ∞</small></div></div>
  <button class="action left-fire" id="left-fire-btn" aria-label="Fire with left hand"><span class="ico">🔫</span><span class="lbl">FIRE</span></button>
@@ -355,6 +356,111 @@ function deathFx(group,from){
  combatFx().startRagdoll(group,fallYawFrom(from,{x:group.position.x,z:group.position.z}),4+Math.random()*2);
 }
 function resetCombatFx(){if(hitFx)hitFx.clear();activeContract=null}
+
+// --- Teleport portal -------------------------------------------------------
+// The sequence runs on real time so it lasts the same on any device, whatever
+// the frame rate. Movement inputs are locked for the duration.
+let teleportFlow=null, portalObj=null;
+const teleportFade=document.createElement('div');teleportFade.id='teleport-fade';document.body.appendChild(teleportFade);
+function buildPortal(){
+ const g=new THREE.Group();
+ const disc=new THREE.Mesh(new THREE.CircleGeometry(1.25,48),new THREE.MeshBasicMaterial({color:0x12052a,transparent:true,opacity:.92,side:THREE.DoubleSide}));
+ const core=new THREE.Mesh(new THREE.CircleGeometry(1,48),new THREE.MeshBasicMaterial({color:0x9ff3ff,transparent:true,opacity:.3,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide}));
+ core.position.z=-.01;
+ const ringA=new THREE.Mesh(new THREE.TorusGeometry(1.3,.09,16,72),new THREE.MeshBasicMaterial({color:0x6fe7ff}));
+ const ringB=new THREE.Mesh(new THREE.TorusGeometry(1.05,.05,12,64),new THREE.MeshBasicMaterial({color:0xb36bff}));
+ const N=90,pos=new Float32Array(N*3),sparks=new THREE.Points(new THREE.BufferGeometry(),new THREE.PointsMaterial({color:0xd8fbff,size:.13,transparent:true,opacity:.9,depthWrite:false}));
+ sparks.geometry.setAttribute('position',new THREE.BufferAttribute(pos,3));
+ g.add(disc,core,ringA,ringB,sparks);g.userData={core,ringA,ringB,sparks,pos,N};g.visible=false;scene.add(g);return g;
+}
+function animatePortal(now){
+ const pm=portalObj,u=pm.userData,t=now/1000;
+ u.ringA.rotation.z+=.04;u.ringB.rotation.z-=.06;u.core.material.opacity=.22+.1*Math.sin(t*6);
+ for(let i=0;i<u.N;i++){const a=i/u.N*Math.PI*2+t*3,r=1.25*(.72+.28*((i*.618+t*.9)%1));u.pos[i*3]=Math.cos(a)*r;u.pos[i*3+1]=Math.sin(a)*r;u.pos[i*3+2]=Math.sin(t*4+i)*.12}
+ u.sparks.geometry.attributes.position.needsUpdate=true;
+}
+function teleportBlocker(){
+ if(!started||ended)return 'NOT RIGHT NOW';
+ if(insideHome)return 'LEAVE HOME FIRST';
+ if(jailedUntil>gameTime||busted)return 'NOT WHILE LOCKED UP';
+ if(race||raceOpen)return 'FINISH THE RACE FIRST';
+ if(teleportFlow)return 'A PORTAL IS ALREADY OPEN';
+ if(mapOpen||settingsOpen||gameMenuOpen||arcadeOpen||casinoOpen||editingLayout)return 'CLOSE THE MENU FIRST';
+ return null;
+}
+function openTeleport(){
+ const why=teleportBlocker();if(why){showToast(why);return}
+ resetInputs();placeOpen=true;$('place-overlay').hidden=false;
+ const from=vehicle?vehicle.mesh.position:player.position;
+ $('place-title').textContent='TELEPORT';
+ $('place-desc').textContent=`Pick a destination. Fares start at $0.50 and rise with distance. Confirm and a portal opens in front of you. Balance: ${formatFare(balanceCents(progress))}`;
+ $('place-actions').replaceChildren();
+ const places=LANDMARKS.filter(l=>l.kind!=='home').map(l=>({id:l.id,name:l.name,...entrance(l)}));
+ for(const d of destinationList(from,places))placeButton(`${formatFare(d.cents)} · ${d.name} · ${d.distance} m`,()=>showTeleportConfirm(d));
+ placeButton('CLOSE',closePlace);
+}
+function showTeleportConfirm(d){
+ const can=balanceCents(progress)>=d.cents;
+ $('place-title').textContent=`PORTAL · ${d.name}`;
+ $('place-desc').textContent=`${d.distance} m away. Fare ${formatFare(d.cents)}. ${can?'A portal opens in front of you. Walk in and you step out at the destination.':'Not enough cash for this fare.'}`;
+ $('place-actions').replaceChildren();
+ placeButton(`CONFIRM · ${formatFare(d.cents)}`,()=>{closePlace();startTeleport(d)});
+ $('place-actions').lastElementChild.disabled=!can;
+ placeButton('BACK TO LIST',openTeleport);
+}
+function startTeleport(d){
+ const why=teleportBlocker();if(why){showToast(why);return}
+ if(!applyFare(progress,d.cents)){showToast('NOT ENOUGH CASH FOR THIS FARE');return}
+ refreshCash();
+ const mover=vehicle?vehicle.mesh:player,yaw=cameraYaw;
+ const start={x:mover.position.x,z:mover.position.z};
+ const portal=portalFront(start,yaw),exit=portalFront({x:d.x,z:d.z},yaw,EXIT_OFFSET);
+ portalObj=portalObj||buildPortal();
+ portalObj.visible=true;portalObj.scale.setScalar(.01);portalObj.position.set(portal.x,1.3,portal.z);portalObj.rotation.y=yaw;
+ mover.rotation.y=yaw;if(vehicle)player.rotation.y=yaw;
+ teleportFlow={phase:'open',t0:performance.now(),mover,start,portal,exit,dest:{x:d.x,z:d.z},name:d.name,yaw,fare:d.cents};
+ sound('warp');showToast(`PORTAL OPENING · ${d.name} · ${formatFare(d.cents)}`);
+}
+function stepTeleport(){
+ const f=teleportFlow;if(!f)return false;
+ const {phase,t}=teleportPhase(performance.now()-f.t0),e=t*t*(3-2*t),m=f.mover,pm=portalObj;
+ if(phase!==f.phase){
+  f.phase=phase;
+  if(phase==='done'){
+   pm.visible=false;m.scale.setScalar(1);player.scale.setScalar(1);
+   m.position.set(f.dest.x,0,f.dest.z);player.position.set(f.dest.x,0,f.dest.z);
+   vehicleSpeed=0;teleportFade.style.opacity=0;teleportFlow=null;
+   sound('success');showToast(`ARRIVED · ${f.name} · PAID ${formatFare(f.fare)}`);
+   return false;
+  }
+ }
+ teleportFade.style.opacity=fadeLevel(phase,t);
+ // Transfer behind the black frame, once. Checked by phase order rather than
+ // equality, so a slow frame that skips 'hold' still moves the player.
+ if(!f.moved&&['hold','fadeIn','emerge','close'].includes(phase)){
+  f.moved=true;
+  m.position.set(f.exit.x,0,f.exit.z);m.scale.setScalar(.2);
+  player.position.set(f.exit.x,0,f.exit.z);
+  pm.position.set(f.exit.x,1.3,f.exit.z);pm.rotation.y=f.yaw;
+  sound('warp');
+ }
+ switch(phase){
+  case 'open': pm.scale.setScalar(Math.max(.01,1-Math.pow(1-t,3)));break;
+  case 'enter':
+   m.position.x=f.start.x+(f.portal.x-f.start.x)*e;m.position.z=f.start.z+(f.portal.z-f.start.z)*e;
+   m.scale.setScalar(Math.max(.2,1-.8*e));break;
+  case 'fadeOut':teleportFade.style.opacity=t;m.scale.setScalar(.2);break;
+  case 'hold':teleportFade.style.opacity=1;break;
+  case 'fadeIn':teleportFade.style.opacity=1-t;break;
+  case 'emerge':
+   m.position.x=f.exit.x+(f.dest.x-f.exit.x)*e;m.position.z=f.exit.z+(f.dest.z-f.exit.z)*e;
+   m.scale.setScalar(.2+.8*e);break;
+  case 'close':pm.scale.setScalar(Math.max(.01,1-t));m.scale.setScalar(1);break;
+ }
+ if(m!==player)player.position.copy(m.position);
+ animatePortal(performance.now());
+ return true;
+}
 let music=null,songRadio=null, sfxVolume=preferences.sfxVolume,musicVolume=preferences.musicVolume,musicTrack=preferences.musicTrack,graphicsQuality=preferences.graphicsQuality; const rewardsPaid=new Set();
 let vehicle=null, vehicleSpeed=0, health=100, mission=0, phase=0, kills=0, heat=0, started=false, ended=false, sideMissionKills=0, fireHeld=false, sprintHeld=false, aiming=false, aimAssist=preferences.aimAssist, lookSensitivity=preferences.lookSensitivity, aimSensitivity=preferences.aimSensitivity, steerSensitivity=preferences.steerSensitivity, invertLook=preferences.invertLook, highContrast=preferences.highContrast, voiceLines=preferences.voiceLines;
 const firePointers=new Set(),inputResets=[];let keyboardFire=false,gasHeld=false,brakeHeld=false,weaponMenuOpen=false;
@@ -374,6 +480,7 @@ function sound(kind){
  const osc=audio.createOscillator(),gain=audio.createGain();osc.connect(gain);gain.connect(audio.destination);
  if(kind==='shot'){osc.type='sawtooth';osc.frequency.setValueAtTime(150,now);osc.frequency.exponentialRampToValueAtTime(45,now+.09);gain.gain.setValueAtTime(Math.max(.0001,.075*sfxVolume),now);gain.gain.exponentialRampToValueAtTime(.001,now+.1);osc.start(now);osc.stop(now+.1)}
  else if(kind==='boom'){osc.type='sawtooth';osc.frequency.setValueAtTime(120,now);osc.frequency.exponentialRampToValueAtTime(28,now+.5);gain.gain.setValueAtTime(Math.max(.0001,.3*sfxVolume),now);gain.gain.exponentialRampToValueAtTime(.001,now+.55);osc.start(now);osc.stop(now+.55);const noise=audio.createBufferSource(),buf=audio.createBuffer(1,audio.sampleRate*.4,audio.sampleRate),data=buf.getChannelData(0);for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*Math.pow(1-i/data.length,2);noise.buffer=buf;const ng=audio.createGain();ng.gain.value=.22*sfxVolume;noise.connect(ng);ng.connect(audio.destination);noise.start();return}
+ else if(kind==='warp'){osc.type='sine';osc.frequency.setValueAtTime(160,now);osc.frequency.exponentialRampToValueAtTime(1400,now+.6);gain.gain.setValueAtTime(Math.max(.0001,.12*sfxVolume),now);gain.gain.exponentialRampToValueAtTime(.001,now+.75);osc.start(now);osc.stop(now+.75)}
  else if(kind==='step'||kind==='engine'){osc.type=kind==='step'?'triangle':'sawtooth';osc.frequency.setValueAtTime(kind==='step'?95:65,now);osc.frequency.exponentialRampToValueAtTime(kind==='step'?45:48,now+.11);gain.gain.setValueAtTime(Math.max(.0001,(kind==='step'?.018:.012)*sfxVolume),now);gain.gain.exponentialRampToValueAtTime(.0001,now+.12);osc.start(now);osc.stop(now+.12)}
  else {osc.type='sine';osc.frequency.setValueAtTime(kind==='success'?660:330,now);osc.frequency.exponentialRampToValueAtTime(kind==='success'?990:180,now+.16);gain.gain.setValueAtTime(Math.max(.0001,.065*sfxVolume),now);gain.gain.exponentialRampToValueAtTime(.001,now+.2);osc.start(now);osc.stop(now+.2)}
 }
@@ -509,7 +616,7 @@ function enterPlace(place){sound('success');resetInputs();insideHome=true;interi
 function exitHome(travel=false){sound('reload');resetInputs();insideHome=false;homeInterior.visible=false;for(const room of Object.values(interiors))room.visible=false;marker.visible=true;const p=travel?selectedDistrict:entrance(interiorPlace);player.position.set(p.x,0,p.z);cameraYaw=travel?(p.x<0?Math.PI/2:-Math.PI/2):-Math.PI/2;player.rotation.y=cameraYaw;camera.position.set(p.x+Math.sin(cameraYaw)*7,4.5,p.z+Math.cos(cameraYaw)*7);routeTarget=null;if(!missionActive){if(travel){target=entrance(LANDMARKS.find(x=>x.id==='hub'));setObjective('FREE ROAM','Visit the mission hub to start a job.',1)}else setObjective('FREE ROAM','Explore the city or visit the mission hub.',1)}showToast(travel?`ARRIVED · ${selectedDistrict.name}`:missionActive?'RETURN TO YOUR MISSION':interiorPlace.id!=='home'?`LEFT ${interiorPlace.name} · FOLLOW YOUR GPS`:selectedDistrict.id==='city'?'FOLLOW THE MARKER TO THE MISSION HUB':`FOLLOW THE MARKER TO ${selectedDistrict.name}`)}
 function closePlace(){placeOpen=false;$('place-overlay').hidden=true}
 function placeButton(label,callback){const button=document.createElement('button');button.className='place-action';button.textContent=label;button.onclick=callback;$('place-actions').appendChild(button)}
-function refreshCash(){saveProgress(storage,progress);$('cash-display').textContent=`$${progress.money}`}
+function refreshCash(){saveProgress(storage,progress);$('cash-display').textContent=`$${progress.money}${progress.cents?'.'+String(progress.cents).padStart(2,'0'):''}`}
 function openPlace(place){
  resetInputs();placeOpen=true;$('place-overlay').hidden=false;$('place-title').textContent=place.name;$('place-actions').replaceChildren();
  const descriptions={home:'Your own space. Take a break and restore your health before heading out.',friend:'A familiar face in the market rows. Your friend says: Stay safe out there!',church:'A quiet landmark and place of reflection in the neighbourhood.',mosque:'A peaceful community landmark in the neighbourhood.',hotel:'A welcoming city hotel. Rest here to restore health for $80 in-game cash.',casino:'A little arcade-style game of chance using in-game cash only. No real money.'};
@@ -952,7 +1059,8 @@ function setMapOpen(open){
  if(open){resetInputs();setWeaponMenu(false);const p=mapCentre();mapView=clampMapView({zoom:mapView.zoom,cx:p.x,cz:p.z});redrawMap();$('close-map').focus()}
  else {(started?$('open-map'):$('menu-map')).focus()}
 }
-$('open-map').onclick=()=>setMapOpen(true);$('menu-map').onclick=()=>setMapOpen(true);$('close-map').onclick=()=>setMapOpen(false);
+$('open-map').onclick=()=>setMapOpen(true);
+$('teleport-button').onclick=()=>openTeleport();$('menu-map').onclick=()=>setMapOpen(true);$('close-map').onclick=()=>setMapOpen(false);
 // Drag to pan, pinch (or wheel) to zoom, buttons for thumb-friendly zooming.
 const fullMapCanvas=$('full-map');
 function mapZoomAt(factor,clientX,clientY){const rect=fullMapCanvas.getBoundingClientRect();mapView=zoomMapView(mapView,factor,(clientX-rect.left)/rect.width*fullMapCanvas.width,(clientY-rect.top)/rect.height*fullMapCanvas.height,fullMapCanvas.width);mapMoved=true;redrawMap()}
@@ -1558,6 +1666,7 @@ window.addEventListener('pagehide',()=>{if(started&&!ended&&!insideHome)saveResu
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&started&&!ended){saveResume();saveProgress(storage,progress);saveGarage()}});
 const clock=new THREE.Clock();let mapTick=0;
 function animate(){requestAnimationFrame(animate);const elapsed=clock.getDelta(),dt=Math.min(elapsed,.05);
+ const teleporting=stepTeleport();if(teleporting){resetInputs();vehicleSpeed=0}
  // The jail clock runs on real time and before every pause gate, so opening a
  // menu, pausing or backgrounding the tab can never trap the player in the cell.
  if(jailedUntil>0){const left=(jailRealUntil-performance.now())/1000;if(left>0){$('jail-count').textContent=`RELEASE IN ${Math.ceil(left)}s`;joy.x=0;joy.y=0}else if(!$('jail-overlay').hidden)releaseFromJail(false)}const radioTrack=race?.status==='running'||missionActive?'race':musicTrack,isSong=!!SONGS[radioTrack];if(music)music.update(isSong?'off':radioTrack,musicVolume,muted||document.hidden);if(songRadio)songRadio.update(isSong?radioTrack:null,musicVolume,muted||document.hidden);updateRaceWorld(dt);updateBubbles();if(mapOpen||settingsOpen||placeOpen||editingLayout||districtOpen||arcadeOpen||casinoOpen||gameMenuOpen||raceOpen)return;
@@ -1692,6 +1801,10 @@ if(import.meta.env.DEV) window.__aivmTest={
   arrestState(){return police.map(c=>c.arrest?.phase||'none')},
   combatFxState(){return {particles:hitFx?.liveCount||0,ragdolls:hitFx?.ragdollCount||0}},
   startContract(id){startContract(id)},
+  teleportState(){return teleportFlow?{phase:teleportFlow.phase,fare:teleportFlow.fare,name:teleportFlow.name}:null},
+  cashCents(){return balanceCents(progress)},
+  openTeleport(){openTeleport()},
+  showTeleportConfirm(id){const d=destinationList(player.position,LANDMARKS.filter(l=>l.kind!=='home').map(l=>({id:l.id,name:l.name,...entrance(l)}))).find(x=>x.id===id);if(d)showTeleportConfirm(d);return !!d},
   hurtContract(){enemies.filter(e=>e.alive&&e.kind==='contract').forEach(e=>damageEnemy(e,999))},
   setWanted(n){heat=n;updateHeat();lastSeenByPolice=gameTime;if(heat<2)clearPolice()},
   teleportToCop(){const cop=police[0];if(!cop)return false;const p=cop.car.mesh.position;
