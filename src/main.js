@@ -24,6 +24,9 @@ import { RACE_CLASSES, tracksForClass, classOfTrack, normalizeRaceClass, default
 import { advanceBot, botCheckpointReached } from './race-ai.js';
 import { SIDE_MISSIONS, SIDE_MISSION_IDS, createSideMission, sideMissionTarget, sideMissionObjective, sideMissionCounter, advanceSideMission, advanceChase, chaseCaught } from './missions.js';
 import { createRaceUI } from './race-ui.js';
+import { createHitFx, fallYawFrom, createSiren } from './fx.js';
+import { createArrest, arrestStep, ARREST } from './arrest.js';
+import { CONTRACTS, contractById, createContract, registerContractKill, contractObjective, contractCard } from './contracts.js';
 import { loadProgress, saveProgress, purchase, reward, PRICES } from './economy.js';
 import { setProgressScope } from './economy.js';
 import { registerAccount, signInAccount, getSessionAccount, signOut } from './accounts.js';
@@ -36,7 +39,7 @@ import './style.css';
 document.querySelector('#app').innerHTML = `
 <canvas id="game" aria-label="3D game view. Drag to look around."></canvas><div class="vignette"></div><div class="damage" id="damage"></div>
 <div class="hud" id="hud">
- <div class="top"><div><div class="brand"><img class="brand-logo" src="${import.meta.env.BASE_URL}assets/logo.png" alt="AIVM — AI Velocity Mobile"></div><div class="mission"><div class="eyebrow" id="mission-number">MISSION 01 / 03</div><h2 id="mission-title">FIRST DELIVERY</h2><p id="objective">Take the bike and pick up the package.</p><div class="count" id="mission-count"></div></div></div><div class="right-hud"><div class="cash-display" id="cash-display">$0</div><div class="heat"><small>HEAT</small><strong id="heat">☆☆☆</strong></div><div class="map-stack"><button class="map-wrap" id="open-map" aria-label="Open full city map" aria-haspopup="dialog"><canvas id="map" width="200" height="200"></canvas><span class="map-label" id="map-orient">HEAD ↑</span><span class="map-tap">TAP MAP</span></button><div class="mini-zoom-row"><button class="mini-zoom" id="mini-zoom" aria-label="Cycle minimap zoom">🔍 1×</button></div><div class="map-note">● YOU &nbsp; ◆ GOAL &nbsp; — GPS</div><button class="settings-button" id="game-menu-button" aria-haspopup="dialog">☰ GAME MENU</button><button class="settings-button" id="settings-button" aria-expanded="false" aria-controls="settings-panel">⚙ SETTINGS</button></div></div></div>
+ <div class="top"><div><div class="brand"><img class="brand-logo" src="${import.meta.env.BASE_URL}assets/logo.png" alt="AIVM — AI Velocity Mobile"></div><div class="mission"><div class="eyebrow" id="mission-number">MISSION 01 / 03</div><h2 id="mission-title">FIRST DELIVERY</h2><p id="objective">Take the bike and pick up the package.</p><div class="count" id="mission-count"></div></div></div><div class="right-hud"><div class="cash-display" id="cash-display">$0</div><div class="heat"><small>HEAT</small><strong id="heat">☆☆☆</strong></div><div class="map-stack"><button class="map-wrap" id="open-map" aria-label="Open full city map" aria-haspopup="dialog"><canvas id="map" width="200" height="200"></canvas><span class="map-label" id="map-orient">HEAD ↑</span><span class="map-tap">TAP MAP</span></button><div class="mini-zoom-row"><button class="mini-zoom-step" id="mini-out" aria-label="Zoom minimap out">−</button><button class="mini-zoom" id="mini-zoom" aria-label="Cycle minimap zoom">🔍 1×</button><button class="mini-zoom-step" id="mini-in" aria-label="Zoom minimap in">+</button></div><div class="map-note">● YOU &nbsp; ◆ GOAL &nbsp; — GPS</div><button class="settings-button" id="game-menu-button" aria-haspopup="dialog">☰ GAME MENU</button><button class="settings-button" id="settings-button" aria-expanded="false" aria-controls="settings-panel">⚙ SETTINGS</button></div></div></div>
  <div class="navigation" id="navigation"><span id="direction-arrow">▲</span><span id="distance">0 M</span><small>OBJECTIVE</small></div><div class="crosshair" id="crosshair"><i></i><i></i><i></i><i></i></div><div class="target-name" id="target-name"></div><div class="hitmarker" id="hitmarker">×</div>
  <div class="bottom-left"><div class="status"><div class="status-top"><span class="status-label">HEALTH</span><span class="health-num" id="health">100</span></div><div class="health-track"><div class="health-fill" id="health-fill"></div></div><div class="weapon-name" id="weapon">PISTOL</div><div class="weapon-sub" id="weapon-sub">AIM ASSIST ON</div><div class="reload-track" id="reload-track" role="progressbar" aria-label="Reload progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="reload-fill"></div></div></div><div class="ammo" id="ammo">12 <small>/ ∞</small></div></div>
  <button class="action left-fire" id="left-fire-btn" aria-label="Fire with left hand"><span class="ico">🔫</span><span class="lbl">FIRE</span></button>
@@ -230,7 +233,7 @@ function updateCity(dt,playerPos){
   p.x=c.x;p.z=c.z;c.mesh.rotation.y=c.ry;
   c.mesh.visible=distance<CROWD_VIEW_DISTANCE&&!insideHome;
   if(c.mesh.visible&&!c.requested&&distance<CROWD_MODEL_DISTANCE&&crowdModelsLoaded<CROWD_MODEL_BUDGET){c.requested=true;crowdModelsLoaded++;models.person(c.mesh,c.role)}
-  if(!c.mesh.visible)continue;
+  if(!c.mesh.visible||c.dead)continue;
   c.walk+=dt;c.animElapsed+=dt;
   const talking=c.mode==='talk'||c.mode==='vendor'||c.mode==='sit';
   setCivilianLOD(c.mesh,distance>22);
@@ -343,6 +346,15 @@ const weapons=[{name:'PISTOL',cap:12,rate:.32,damage:34,range:28},{name:'ASSAULT
 const ammo=weapons.map(w=>w.cap),enemies=[],shots=[],keys={};
 const preferences=loadPreferences(storage), progress=loadProgress(storage); let controlLayout=loadLayout(storage);
 let mapOpen=false, settingsOpen=false, placeOpen=false, editingLayout=false, districtOpen=false, arcadeOpen=false, gameMenuOpen=false, raceOpen=false, sideMission=null, activity=null, selectedDistrict=DISTRICTS[0], insideHome=true, interiorPlace=LANDMARKS[0], missionActive=false, rival=null, dropKills=0; let mapRotate=preferences.mapRotate, controlScale=preferences.controlScale, scoped=false, scopeZoom=1, breathUntil=0, sniperActive=false, tempSniper=false, sniperPrev=null, sniperSpawns=[], lastBark=-9; let mapView={zoom:1,cx:0,cz:0}, miniZoom=1, mapMoved=false, pinchStart=0; const mapPointers=new Map();
+// Wave 14: combat FX, siren, arrest officers and contracts.
+let hitFx=null, sirenFx=null, arrestOfficers=[], activeContract=null;
+function combatFx(){if(!hitFx)hitFx=createHitFx(THREE,scene);return hitFx}
+function impactFx(group,from){const p=group.position,dx=p.x-from.x,dz=p.z-from.z,l=Math.hypot(dx,dz)||1;combatFx().burst({x:p.x,y:p.y+1.3,z:p.z},{x:dx/l,z:dz/l},14)}
+function deathFx(group,from){
+ for(const child of group.children)if(child.userData.persist)child.visible=false;
+ combatFx().startRagdoll(group,fallYawFrom(from,{x:group.position.x,z:group.position.z}),4+Math.random()*2);
+}
+function resetCombatFx(){if(hitFx)hitFx.clear();activeContract=null}
 let music=null,songRadio=null, sfxVolume=preferences.sfxVolume,musicVolume=preferences.musicVolume,musicTrack=preferences.musicTrack,graphicsQuality=preferences.graphicsQuality; const rewardsPaid=new Set();
 let vehicle=null, vehicleSpeed=0, health=100, mission=0, phase=0, kills=0, heat=0, started=false, ended=false, sideMissionKills=0, fireHeld=false, sprintHeld=false, aiming=false, aimAssist=preferences.aimAssist, lookSensitivity=preferences.lookSensitivity, aimSensitivity=preferences.aimSensitivity, steerSensitivity=preferences.steerSensitivity, invertLook=preferences.invertLook, highContrast=preferences.highContrast, voiceLines=preferences.voiceLines;
 const firePointers=new Set(),inputResets=[];let keyboardFire=false,gasHeld=false,brakeHeld=false,weaponMenuOpen=false;
@@ -424,7 +436,7 @@ function updateNavigation(){
 function finish(won){if(ended)return;const wasSide=!!activity;if(wasSide){activity=null;missionActive=false}ended=true;resetInputs();setWeaponMenu(false);$('end-kicker').textContent=won?'ALL THREE MISSIONS COMPLETE':'MISSION FAILED';$('end-title').innerHTML=won?'RUN <span>COMPLETE.</span>':'DOWN <span>OUT.</span>';$('end-text').textContent=won?'You made the delivery, recovered the case, and escaped the city. Nice work.':wasSide?'The job ended. Return to the city and try again.':'Retry this mission with full health and ammo, or start the whole run again.';$('retry').hidden=won||wasSide;$('return-city').hidden=!won&&!wasSide;$('restart').textContent=won?'PLAY AGAIN':'START OVER';$('end').classList.remove('hidden')}
 function retryMission(){
  if(!ended)return;
- resetInputs();removeRival();for(const enemy of enemies)scene.remove(enemy.mesh);enemies.length=0;
+ resetInputs();removeRival();for(const enemy of enemies)scene.remove(enemy.mesh);enemies.length=0;resetCombatFx();
  for(const shot of shots){scene.remove(shot.line);shot.line.geometry.dispose();shot.line.material.dispose()}shots.length=0;
  if(vehicle){vehicle.occupied=false;if(vehicle.rider)vehicle.rider.visible=false}vehicle=null;vehicleSpeed=0;engineAudio.stop();player.visible=true;
  const start=[{x:0,z:13},{x:56,z:-28},{x:28,z:28}][mission];player.position.set(start.x,0,start.z);player.rotation.y=0;
@@ -606,7 +618,21 @@ function cycleRadio(){
 // --- Wanted level: patrol cars, line of sight and getting busted ---
 let police=[],lastSeenByPolice=0,lastCrimeReport=0,busted=false,trainedUntil=0,bikeServicedUntil=0;
 function updateHeat(){$('heat').textContent='★'.repeat(Math.max(0,Math.min(3,heat)))+'☆'.repeat(Math.max(0,3-heat))}
-function clearPolice(){for(const cop of police)scene.remove(cop.car.mesh);police.length=0}
+function clearPolice(){for(const cop of police)scene.remove(cop.car.mesh);police.length=0;for(const o of arrestOfficers)scene.remove(o.mesh);arrestOfficers.length=0}
+function deployOfficer(cop){
+ const p=cop.car.mesh.position,officer=world.person(0x1f3f7a);officer.position.set(p.x+1.3,0,p.z);scene.add(officer);models.person(officer,'officer');
+ arrestOfficers.push({mesh:officer,cop,walk:0});
+}
+function nearestOfficerDist(cop){let best=Infinity;for(const o of arrestOfficers){if(o.cop!==cop)continue;best=Math.min(best,Math.hypot(o.mesh.position.x-player.position.x,o.mesh.position.z-player.position.z))}return best}
+function updateOfficers(dt,pos){
+ for(const o of arrestOfficers){
+  const cop=o.cop;if(!cop.arrest||cop.arrest.phase==='patrol')continue;
+  const dx=pos.x-o.mesh.position.x,dz=pos.z-o.mesh.position.z,d=Math.hypot(dx,dz)||1;
+  const stepLen=d>ARREST.officerRange*.8?Math.min(ARREST.officerSpeed*dt,d):0;
+  o.mesh.position.x+=dx/d*stepLen;o.mesh.position.z+=dz/d*stepLen;o.mesh.rotation.y=Math.atan2(dx,dz);
+  o.walk+=dt;animateWalk(o.mesh,stepLen>0?1:0,o.walk,dt);
+ }
+}
 function spawnPoliceCar(pos){
  const angle=Math.random()*Math.PI*2,distance=44+Math.random()*20;
  const x=Math.max(-138,Math.min(138,pos.x+Math.cos(angle)*distance)),z=Math.max(-138,Math.min(138,pos.z+Math.sin(angle)*distance));
@@ -641,17 +667,22 @@ function releaseFromJail(bail){
 // you for a while — the same pressure loop an open-world city game uses.
 function updatePolice(dt,pos){
  if(heat<2||insideHome||busted){if(police.length)clearPolice();return}
+ updateOfficers(dt,pos);
  while(police.length<Math.min(3,heat-1))spawnPoliceCar(pos);
  for(const cop of police){
   const p=cop.car.mesh.position,distance=p.distanceTo(pos);
   cop.flash+=dt*6;
   cop.blueLamp.visible=Math.sin(cop.flash)>0;cop.redLamp.visible=!cop.blueLamp.visible;
   if(gameTime>=cop.nextRoute){cop.route=roadRoute(p,pos);cop.nextRoute=gameTime+.9}
+  if(cop.arrest&&cop.arrest.phase!=='patrol'){cop.car.mesh.rotation.y=Math.atan2(pos.x-p.x,pos.z-p.z)}
   if(distance>7){const facing=advancePursuit(p,cop.route,dt,world.blocks,heat>=3?15:12.5);if(facing!==null)cop.car.mesh.rotation.y=facing;for(const wheel of cop.car.wheels)wheel.rotation.x-=13*dt*.8}
   const sees=hasLineOfSight(p,pos,world.blocks);
   if(distance<26&&sees){lastSeenByPolice=gameTime;cop.sees=true}else cop.sees=false;
-  if(distance<6&&sees)cop.catchTime+=dt;else cop.catchTime=Math.max(0,cop.catchTime-dt*.6);
-  if(cop.catchTime>3.4){bustPlayer();return}
+  cop.arrest=cop.arrest||createArrest();
+  arrestStep(cop.arrest,{dist:distance,sees,officerDist:nearestOfficerDist(cop),dt});
+  if(cop.arrest.phase==='exit'&&!cop.deployed){cop.deployed=true;deployOfficer(cop);showToast('POLICE · OUT OF THE CAR · STAY WHERE YOU ARE')}
+  if(cop.arrest.phase==='arrest'&&!cop.announced){cop.announced=true;showToast('ARRESTED · HANDS WHERE WE CAN SEE THEM')}
+  if(cop.arrest.phase==='booked'){bustPlayer();return}
  }
  if(gameTime-lastSeenByPolice>13&&heat>0){
   heat=Math.max(0,heat-1);updateHeat();lastSeenByPolice=gameTime;
@@ -670,7 +701,7 @@ function closeArcade(){arcadeSession++;arcadeOpen=false;$('arcade-overlay').hidd
 function openCasino(){closePlace();resetInputs();casinoOpen=true;$('arcade-overlay').hidden=false;casinoHandle?.destroy?.();casinoHandle=createCasino($('arcade-panel'),progress,refreshCash,closeCasino,sound);$('arcade-panel').querySelector('button')?.focus()}
 function closeCasino(){casinoHandle?.destroy?.();casinoHandle=null;casinoOpen=false;$('arcade-overlay').hidden=true;openPlace(interiorPlace)}
 function speakDialogue(playerLine,npcLine){if(!voiceLines||muted||!('speechSynthesis' in window)||!('SpeechSynthesisUtterance' in window))return;try{window.speechSynthesis.cancel();for(const [text,pitch] of [[playerLine,.9],[npcLine,1.1]]){const u=new SpeechSynthesisUtterance(text);u.pitch=pitch;u.volume=sfxVolume;window.speechSynthesis.speak(u)}}catch{}}
-function nearestPerson(){if(!started||insideHome||vehicle)return null;let nearest=null,best=6.5;for(const c of civilians){if(!c.mesh.visible)continue;const d=Math.hypot(c.x-player.position.x,c.z-player.position.z);if(d<best){best=d;nearest=c}}return nearest}
+function nearestPerson(){if(!started||insideHome||vehicle)return null;let nearest=null,best=6.5;for(const c of civilians){if(!c.mesh.visible||c.dead)continue;const d=Math.hypot(c.x-player.position.x,c.z-player.position.z);if(d<best){best=d;nearest=c}}return nearest}
 // Named strangers: every person on the street keeps a stable name, so talking to
 // them twice feels like the same neighbour rather than a random generator.
 const STREET_NAMES=['AMA','TUNDE','ZAINAB','KELECHI','MUSA','BISI','EMEKA','HALIMA','SEUN','NGOZI','IBRAHIM','FUNKE','DAYO','AISHA','CHIDI','YEMI','BOLA','KEMI','SOLA','CHIKA','MALLAM MUSA','AUNTY BISI','TATAFO','OKAFOR','MAMA NKECHI','BROTHER JOE'];
@@ -810,8 +841,8 @@ function nearestAnyTarget(){
 }
 function damageCivilian(c,amount){
  if(c.dead)return;c.hp=(c.hp??100)-amount;setHitFlash(c.mesh,true);setTimeout(()=>setHitFlash(c.mesh,false),100);$('hitmarker').classList.add('active');setTimeout(()=>$('hitmarker').classList.remove('active'),100);
- if(c.hp>0){c.hostileUntil=gameTime+25;c.hostileCd=.4;c.mode='talk';c.line='YOU SHOT ME!';c.lineUntil=gameTime+2;return}
- c.dead=true;c.mesh.visible=false;
+ impactFx(c.mesh,player.position);if(c.hp>0){c.hostileUntil=gameTime+25;c.hostileCd=.4;c.mode='talk';c.line='YOU SHOT ME!';c.lineUntil=gameTime+2;return}
+ c.dead=true;deathFx(c.mesh,player.position);
  reward(progress,30);saveProgress(storage,progress);refreshCash();showToast('THEY DROPPED THEIR WALLET · +$30');
  heat=Math.min(3,heat+1);updateHeat();lastCrimeReport=gameTime;lastSeenByPolice=gameTime;
  for(const other of civilians){if(other.dead||other===c||!other.mesh.visible)continue;if(Math.hypot(other.x-c.x,other.z-c.z)<14){other.hostileUntil=gameTime+25;other.hostileCd=.8+Math.random();other.mode='talk';other.line='MAN DOWN!';other.lineUntil=gameTime+2}}
@@ -819,7 +850,7 @@ function damageCivilian(c,amount){
 function addTracer(from,to,color){const geo=new THREE.BufferGeometry().setFromPoints([from,to]);const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color}));scene.add(line);shots.push({line,until:gameTime+.09})}
 function damageEnemy(enemy,amount){
  if(!enemy.alive)return;enemy.hp-=amount;setHitFlash(enemy.mesh,true);setTimeout(()=>setHitFlash(enemy.mesh,false),100);$('hitmarker').classList.add('active');setTimeout(()=>$('hitmarker').classList.remove('active'),100);
- if(enemy.hp<=0){enemy.alive=false;scene.remove(enemy.mesh);if(enemy.kind==='target'&&sniperActive){endSniperContract(true)}if(mission===0&&phase===2&&enemy.kind==='drop-guard'){dropKills++;$('mission-count').textContent=`ATTACKERS DOWN  ${Math.min(dropKills,3)} / 3`}if(mission===1&&phase===0&&enemy.kind==='guard'){kills++;$('mission-count').textContent=`GUARDS DOWN  ${Math.min(kills,4)} / 4`}
+ impactFx(enemy.mesh,player.position);if(enemy.hp<=0){enemy.alive=false;deathFx(enemy.mesh,player.position);if(enemy.kind==='contract'&&activeContract)onContractKill();if(enemy.kind==='target'&&sniperActive){endSniperContract(true)}if(mission===0&&phase===2&&enemy.kind==='drop-guard'){dropKills++;$('mission-count').textContent=`ATTACKERS DOWN  ${Math.min(dropKills,3)} / 3`}if(mission===1&&phase===0&&enemy.kind==='guard'){kills++;$('mission-count').textContent=`GUARDS DOWN  ${Math.min(kills,4)} / 4`}
   if(enemy.kind==='mission'&&sideMission){sideMissionKills++;sideMission.cleared=sideMissionKills;$('mission-count').textContent=sideMissionCounter(sideMission)||'';const step=SIDE_MISSIONS[sideMission.id].steps[sideMission.step];if(step?.kind==='clear'&&sideMissionKills>=step.count){const state=advanceSideMission(sideMission,vehicle?vehicle.mesh.position:player.position,sideMissionKills);if(state)onSideMissionStep(state,true)}}}
 }
 function shoot(){
@@ -928,7 +959,18 @@ function mapZoomAt(factor,clientX,clientY){const rect=fullMapCanvas.getBoundingC
 function mapZoomButton(factor){const rect=fullMapCanvas.getBoundingClientRect();mapZoomAt(factor,rect.left+rect.width/2,rect.top+rect.height/2)}
 $('map-zoom-in').onclick=()=>mapZoomButton(1.5);$('map-zoom-out').onclick=()=>mapZoomButton(1/1.5);
 $('map-follow').onclick=()=>{const p=mapCentre();mapView=clampMapView({zoom:Math.max(mapView.zoom,2.2),cx:p.x,cz:p.z});redrawMap();showToast('MAP CENTRED ON YOU')};
-$('mini-zoom').onclick=e=>{e.stopPropagation();miniZoom=miniZoom===1?1.7:miniZoom===1.7?.6:1;$('mini-zoom').textContent=`🔍 ${miniZoom}×`;updateMap();if(started)showToast(`MINIMAP ZOOM · ${miniZoom}×`)};
+function setMiniZoom(value,toast=true){miniZoom=Math.max(.5,Math.min(3,+value.toFixed(2)));$('mini-zoom').textContent=`🔍 ${miniZoom}×`;updateMap();if(started&&toast)showToast(`MINIMAP ZOOM · ${miniZoom}×`)}
+$('mini-zoom').onclick=e=>{e.stopPropagation();setMiniZoom(miniZoom===1?1.7:miniZoom===1.7?.6:1)};
+$('mini-in').onclick=e=>{e.stopPropagation();setMiniZoom(miniZoom*1.3)};
+$('mini-out').onclick=e=>{e.stopPropagation();setMiniZoom(miniZoom/1.3)};
+// Pinch on the minimap only: the rest of the HUD never reacts to two fingers.
+const miniPointers=new Map();let miniPinchStart=0,miniPinched=false;
+const miniCanvas=$('map');
+miniCanvas.addEventListener('pointerdown',e=>{miniPointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(miniPointers.size===2){const[a,b]=[...miniPointers.values()];miniPinchStart=Math.hypot(a.x-b.x,a.y-b.y)||1;miniPinched=true}});
+miniCanvas.addEventListener('pointermove',e=>{if(!miniPointers.has(e.pointerId))return;miniPointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(miniPointers.size===2){const[a,b]=[...miniPointers.values()],d=Math.hypot(a.x-b.x,a.y-b.y)||1;setMiniZoom(miniZoom*(d/miniPinchStart),false);miniPinchStart=d}});
+const endMiniPointer=e=>{miniPointers.delete(e.pointerId);if(miniPointers.size<2)miniPinchStart=0;if(miniPointers.size===0)setTimeout(()=>{miniPinched=false},250)};
+miniCanvas.addEventListener('pointerup',endMiniPointer);miniCanvas.addEventListener('pointercancel',endMiniPointer);
+$('open-map').addEventListener('click',e=>{if(miniPinched){e.stopImmediatePropagation();e.preventDefault()}},true);
 fullMapCanvas.addEventListener('pointerdown',e=>{try{fullMapCanvas.setPointerCapture(e.pointerId)}catch{}mapPointers.set(e.pointerId,{x:e.clientX,y:e.clientY});mapMoved=false;if(mapPointers.size===2){const[a,b]=[...mapPointers.values()];pinchStart=Math.hypot(a.x-b.x,a.y-b.y)||1}});
 fullMapCanvas.addEventListener('pointermove',e=>{const prev=mapPointers.get(e.pointerId);if(!prev)return;const rect=fullMapCanvas.getBoundingClientRect();
  if(mapPointers.size>=2){mapPointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const[a,b]=[...mapPointers.values()],dist=Math.hypot(a.x-b.x,a.y-b.y)||1;mapMoved=true;pinchStart=pinchStart||dist;const midX=((a.x+b.x)/2-rect.left)/rect.width*fullMapCanvas.width,midY=((a.y+b.y)/2-rect.top)/rect.height*fullMapCanvas.height;mapView=zoomMapView(mapView,dist/pinchStart,midX,midY,fullMapCanvas.width);pinchStart=dist;redrawMap()}
@@ -958,7 +1000,7 @@ function renderMapLegend(){
 function renderDistrictCards(){const list=$('district-scroll');list.replaceChildren();for(const district of DISTRICTS){const button=document.createElement('button');button.className='district-card'+(district.id===selectedDistrict.id?' selected':'');button.setAttribute('aria-pressed',String(district.id===selectedDistrict.id));button.setAttribute('aria-label',`${district.name} environment`);button.innerHTML=`<img src="${import.meta.env.BASE_URL}assets/districts/${district.id}.jpg" alt=""><span class="district-card-label"><b>${district.label}</b><small>${district.name}</small></span>`;button.onclick=()=>{selectedDistrict=district;$('district-choice').textContent=district.label;$('district-caption').textContent=`Selected: ${district.name}`;const scroll=list.scrollLeft;renderDistrictCards();list.scrollLeft=scroll;list.querySelector('.selected')?.focus({preventScroll:true})};button.querySelector('img')?.addEventListener('error',event=>{event.target.src=`${import.meta.env.BASE_URL}assets/districts/city.jpg`});list.appendChild(button)}}
 $('menu-districts').onclick=()=>setDistrictOpen(true);$('settings-districts').onclick=()=>setDistrictOpen(true,true);$('district-travel').onclick=()=>{const gpsOnly=districtFromSettings;setDistrictOpen(false);setSettings(false);if(gpsOnly){setDistrictGps();showToast(`GPS SET · ${selectedDistrict.name}`)}else travelToDistrict()};$('district-close').onclick=cancelDistrict;$('district-confirm').onclick=()=>{const go=districtFromSettings&&started&&!missionActive;setDistrictOpen(false);if(go){setSettings(false);travelToDistrict()}else if(!missionActive)setDistrictGps()};
 function closeGameMenu(){gameMenuOpen=false;$('game-menu-overlay').hidden=true;(started?$('game-menu-button'):$('menu-activities')).focus()}
-function openGameMenu(){if(ended||mapOpen||settingsOpen||placeOpen||districtOpen||arcadeOpen||casinoOpen||raceOpen)return;resetInputs();setWeaponMenu(false);gameMenuOpen=true;$('game-menu-overlay').hidden=false;$('game-menu-note').textContent=!started?'Start the game to begin races and jobs. Arcade and settings are available now.':missionActive?'A job is active; finish or cancel it before starting another.':'Choose an activity. Time trials are solo and use in-game cash rewards.';const grid=$('game-menu-grid');grid.replaceChildren();function add(label,fn,disabled=false){const b=document.createElement('button');b.textContent=label;b.disabled=disabled;b.onclick=fn;grid.appendChild(b)}add('🏁 CAR RACE ROOM · 2-5 CARS',()=>{closeGameMenu();setRaceClass('car');openRaceRoom()},!started||missionActive);add('🏍️ BIKE RACE ROOM · 2-5 BIKES',()=>{closeGameMenu();setRaceClass('bike');openRaceRoom()},!started||missionActive);add(`🚘 ${DEALERSHIP_NAME} · BUY CARS & BIKES`,()=>{closeGameMenu();openDealership()},!started);add('📞 CALL MY VEHICLE HERE',()=>{closeGameMenu();openGaragePicker()},!started||!ownedVehicles.length);add('📻 RADIO · CHANGE STATION',()=>{closeGameMenu();cycleRadio()},!started);for(const [label,id] of [['🏁 CAR RACING · TIME TRIAL','carRace'],['🏍️ BIKE RACING · TIME TRIAL','bikeRace']])add(label,()=>{closeGameMenu();beginSideActivity(id)},!started||missionActive);add('📋 MISSIONS · NIGHT PATROL & MORE',()=>{closeGameMenu();openMissions()},!started||(missionActive&&!sideMission));for(const [label,id] of [['📦 COASTAL COURIER · JOB','coast'],['📦 PORT DISPATCH · JOB','port']])add(label,()=>{closeGameMenu();beginSideActivity(id)},!started||missionActive);if(sideMission)add('❌ CANCEL CURRENT MISSION',()=>{closeGameMenu();finishSideMission(false)});if(activity)add('❌ CANCEL CURRENT ACTIVITY',()=>{closeGameMenu();finishSideActivity(false)});add('🎯 ROOFTOP SNIPER · CONTRACT',()=>{closeGameMenu();startSniperContract()},!started||missionActive);add('🎮 MINI GAMES · CHESS, LUDO & MORE',()=>{closeGameMenu();openArcade('menu')});add('⚙️ SETTINGS & ENVIRONMENT',()=>{closeGameMenu();setSettings(true)});add('🗺️ CITY MAP',()=>{closeGameMenu();setMapOpen(true)});$('game-menu-close').focus()}
+function openGameMenu(){if(ended||mapOpen||settingsOpen||placeOpen||districtOpen||arcadeOpen||casinoOpen||raceOpen)return;resetInputs();setWeaponMenu(false);gameMenuOpen=true;$('game-menu-overlay').hidden=false;$('game-menu-note').textContent=!started?'Start the game to begin races and jobs. Arcade and settings are available now.':missionActive?'A job is active; finish or cancel it before starting another.':'Choose an activity. Time trials are solo and use in-game cash rewards.';const grid=$('game-menu-grid');grid.replaceChildren();function add(label,fn,disabled=false){const b=document.createElement('button');b.textContent=label;b.disabled=disabled;b.onclick=fn;grid.appendChild(b)}add('🏁 CAR RACE ROOM · 2-5 CARS',()=>{closeGameMenu();setRaceClass('car');openRaceRoom()},!started||missionActive);add('🏍️ BIKE RACE ROOM · 2-5 BIKES',()=>{closeGameMenu();setRaceClass('bike');openRaceRoom()},!started||missionActive);add(`🚘 ${DEALERSHIP_NAME} · BUY CARS & BIKES`,()=>{closeGameMenu();openDealership()},!started);add('📞 CALL MY VEHICLE HERE',()=>{closeGameMenu();openGaragePicker()},!started||!ownedVehicles.length);add('📻 RADIO · CHANGE STATION',()=>{closeGameMenu();cycleRadio()},!started);for(const [label,id] of [['🏁 CAR RACING · TIME TRIAL','carRace'],['🏍️ BIKE RACING · TIME TRIAL','bikeRace']])add(label,()=>{closeGameMenu();beginSideActivity(id)},!started||missionActive);add('📋 MISSIONS · NIGHT PATROL & MORE',()=>{closeGameMenu();openMissions()},!started||(missionActive&&!sideMission));for(const [label,id] of [['📦 COASTAL COURIER · JOB','coast'],['📦 PORT DISPATCH · JOB','port']])add(label,()=>{closeGameMenu();beginSideActivity(id)},!started||missionActive);if(sideMission)add('❌ CANCEL CURRENT MISSION',()=>{closeGameMenu();finishSideMission(false)});if(activity)add('❌ CANCEL CURRENT ACTIVITY',()=>{closeGameMenu();finishSideActivity(false)});if(activeContract)add('❌ ABANDON CONTRACT',()=>{closeGameMenu();abandonContract()});add('📜 CONTRACT BOARD · ELIMINATIONS',()=>{closeGameMenu();openContractBoard()},!started||missionActive||!!activeContract);add('🎯 ROOFTOP SNIPER · CONTRACT',()=>{closeGameMenu();startSniperContract()},!started||missionActive);add('🎮 MINI GAMES · CHESS, LUDO & MORE',()=>{closeGameMenu();openArcade('menu')});add('⚙️ SETTINGS & ENVIRONMENT',()=>{closeGameMenu();setSettings(true)});add('🗺️ CITY MAP',()=>{closeGameMenu();setMapOpen(true)});$('game-menu-close').focus()}
 function openGaragePicker(){
  if(!ownedVehicles.length){showToast('YOU DO NOT OWN A VEHICLE YET · VISIT HALCYON MOTORS');return}
  closePlace();resetInputs();placeOpen=true;$('place-overlay').hidden=false;$('place-title').textContent='YOUR GARAGE';$('place-desc').textContent='Choose which of your vehicles to call to the street beside you.';$('place-actions').replaceChildren();
@@ -986,7 +1028,7 @@ $('scope-zoom-in').onclick=()=>{scopeZoom=Math.min(2,scopeZoom+1);updateScopeInf
 $('scope-zoom-out').onclick=()=>{scopeZoom=Math.max(0,scopeZoom-1);updateScopeInfo()};
 $('scope-breath').onclick=()=>{breathUntil=gameTime+2.6;showToast('BREATH HELD · SCOPE STEADY')};
 $('scope-leave').onclick=()=>endSniperContract(false);
-$('retry').onclick=retryMission;$('return-city').onclick=()=>{resetInputs();removeRival();for(const enemy of enemies)scene.remove(enemy.mesh);enemies.length=0;mission=0;phase=0;kills=0;dropKills=0;heat=0;missionActive=false;activity=null;rewardsPaid.clear();target=entrance(LANDMARKS.find(p=>p.id==='hub'));routeTarget=null;health=100;ended=false;$('end').classList.add('hidden');setObjective('FREE ROAM','Visit the mission hub to start a new job.',1);showToast('BACK IN THE CITY · VISIT THE HUB FOR JOBS')};$('restart').onclick=()=>location.reload();$('interact-btn').onclick=interact;$('weapon-btn').onclick=()=>setWeaponMenu(!weaponMenuOpen);$('reload-btn').onclick=reload;$('aim-btn').onclick=toggleAim;
+$('retry').onclick=retryMission;$('return-city').onclick=()=>{resetInputs();removeRival();for(const enemy of enemies)scene.remove(enemy.mesh);enemies.length=0;resetCombatFx();mission=0;phase=0;kills=0;dropKills=0;heat=0;missionActive=false;activity=null;rewardsPaid.clear();target=entrance(LANDMARKS.find(p=>p.id==='hub'));routeTarget=null;health=100;ended=false;$('end').classList.add('hidden');setObjective('FREE ROAM','Visit the mission hub to start a new job.',1);showToast('BACK IN THE CITY · VISIT THE HUB FOR JOBS')};$('restart').onclick=()=>location.reload();$('interact-btn').onclick=interact;$('weapon-btn').onclick=()=>setWeaponMenu(!weaponMenuOpen);$('reload-btn').onclick=reload;$('aim-btn').onclick=toggleAim;
 function setSettings(open){settingsOpen=open;$('settings-panel').hidden=!open;$('settings-button').setAttribute('aria-expanded',String(open));if(open){resetInputs();setWeaponMenu(false)} }
 function updateSettings(){ $('sound-toggle').textContent=muted?'SOUND OFF':'SOUND ON';$('sound-toggle').setAttribute('aria-pressed',String(!muted));$('assist-toggle').textContent=aimAssist?'ASSIST ON':'ASSIST OFF';$('assist-toggle').setAttribute('aria-pressed',String(aimAssist));$('sensitivity').value=lookSensitivity;$('aim-sensitivity').value=aimSensitivity;$('steer-sensitivity').value=steerSensitivity;$('invert-look').textContent=invertLook?'INVERT LOOK ON':'INVERT LOOK OFF';$('invert-look').setAttribute('aria-pressed',String(invertLook));$('high-contrast').textContent=highContrast?'HIGH CONTRAST ON':'HIGH CONTRAST OFF';$('high-contrast').setAttribute('aria-pressed',String(highContrast));const voiceAvailable='speechSynthesis' in window&&'SpeechSynthesisUtterance' in window;$('voice-toggle').disabled=!voiceAvailable;$('voice-toggle').textContent=voiceAvailable?(voiceLines?'DIALOGUE VOICE ON':'DIALOGUE VOICE OFF'):'DIALOGUE VOICE UNAVAILABLE';$('voice-toggle').setAttribute('aria-pressed',String(voiceAvailable&&voiceLines));$('hud').classList.toggle('high-contrast',highContrast);$('sfx-volume').value=sfxVolume*100;$('music-volume').value=musicVolume*100;$('music-track').value=musicTrack;$('graphics-quality').value=graphicsQuality;$('map-rotate').textContent=mapRotate?'🧭 MAP TURNS WITH YOU ON':'🧭 MAP TURNS WITH YOU OFF';$('map-rotate').setAttribute('aria-pressed',String(mapRotate));$('control-size').value=Math.round(controlScale*100);$('map-orient').textContent=mapRotate?'HEAD ↑':'N ↑';const note=$('map-orient-note');if(note)note.textContent=mapRotate?'Map turns as you turn.':'North is up.'; }
 function applyControlSize(){document.documentElement.style.setProperty('--ctrl',controlScale.toFixed(2))}
@@ -1039,6 +1081,56 @@ function endLook(e){if(e.pointerId===lookPointer)lookPointer=null}canvas.addEven
 // Extra missions are short chains of reach/clear/chase steps. They use the same
 // marker, enemies and rewards as the three-mission story, but can be restarted.
 let missionChase=null;
+function openContractBoard(){
+ if(!started||ended)return;
+ if(activeContract){showToast('FINISH YOUR CURRENT CONTRACT FIRST');return}
+ if(missionActive||sideMission||sniperActive){showToast('FINISH YOUR CURRENT JOB FIRST');return}
+ resetInputs();placeOpen=true;$('place-overlay').hidden=false;$('place-title').textContent='CONTRACT BOARD';
+ $('place-desc').textContent='Long-range elimination contracts. Take the vantage roof, pick your angles and clear every target hostile for the fee.';
+ $('place-actions').replaceChildren();
+ for(const c of CONTRACTS){const card=contractCard(createContract(c.id));placeButton(`${card.code} · ${card.title} · $${c.reward.toLocaleString('en-US')}\n${c.targets} TARGETS · ${c.zone}`,()=>showContractDetail(c.id))}
+ placeButton('BACK',closePlace);
+}
+function showContractDetail(id){
+ const c=contractById(id),card=contractCard(createContract(id));
+ $('place-title').textContent=`${card.code} · ${card.title}`;
+ $('place-desc').textContent=`${card.blurb}\n\n${card.lines.join('\n')}`;
+ $('place-actions').replaceChildren();
+ placeButton(`ACCEPT · $${c.reward.toLocaleString('en-US')}`,()=>{closePlace();startContract(id)});
+ placeButton('BACK TO BOARD',openContractBoard);
+}
+function exitContractRoof(){
+ const vp=world.roofs.find(v=>v.id===activeContract?.id);
+ if(vp){player.position.set(vp.x,0,vp.z+14);cameraYaw=0;player.rotation.y=0}
+}
+function startContract(id){
+ if(missionActive||sideMission||sniperActive||activeContract){showToast('FINISH YOUR CURRENT JOB FIRST');return}
+ if(vehicle){showToast('GET OUT OF THE VEHICLE FIRST');return}
+ const c=createContract(id),vp=world.roofs.find(v=>v.id===id);if(!c||!vp)return;
+ activeContract=c;
+ const tx=c.spawns.reduce((a,q)=>a+q[0],0)/c.spawns.length,tz=c.spawns.reduce((a,q)=>a+q[1],0)/c.spawns.length;
+ player.visible=true;player.position.set(vp.x,vp.y,vp.z);cameraYaw=Math.atan2(vp.x-tx,vp.z-tz);player.rotation.y=cameraYaw;
+ for(const [x,z] of c.spawns)spawnEnemy(x,z,'contract');
+ setObjective(c.title,contractObjective(c),1,`TARGETS DOWN  0 / ${c.targets}`);
+ showToast(`CONTRACT ACCEPTED · ${c.code} · TAKE THE ROOF`);
+}
+function onContractKill(){
+ const c=activeContract,result=registerContractKill(c);
+ $('mission-count').textContent=`TARGETS DOWN  ${Math.min(c.killed,c.targets)} / ${c.targets}`;
+ $('objective').textContent=contractObjective(c);
+ if(result==='complete'){
+  for(const e of enemies)if(e.alive&&e.kind==='contract'){e.alive=false;deathFx(e.mesh,player.position)}
+  reward(progress,c.reward);saveProgress(storage,progress);refreshCash();sound('success');
+  exitContractRoof();activeContract=null;
+  setObjective('CONTRACT COMPLETE',`${c.code} paid out · $${c.reward.toLocaleString('en-US')}`,1,'');
+  showToast(`CONTRACT COMPLETE · +$${c.reward.toLocaleString('en-US')}`);
+ }
+}
+function abandonContract(){
+ if(!activeContract)return;const c=activeContract;
+ for(const e of enemies)if(e.alive&&e.kind==='contract'){e.alive=false;scene.remove(e.mesh)}
+ exitContractRoof();activeContract=null;setObjective('CONTRACT ABANDONED',`${c.code} cancelled · no fee`,1,'');showToast('CONTRACT ABANDONED');
+}
 function openMissions(){
   if(!started||ended)return;
   resetInputs();placeOpen=true;$('place-overlay').hidden=false;$('place-title').textContent='CITY MISSIONS';
@@ -1046,6 +1138,7 @@ function openMissions(){
   $('place-actions').replaceChildren();
   if(sideMission)placeButton(`CANCEL ${sideMission.name}`,()=>{closePlace();finishSideMission(false)});
   for(const id of SIDE_MISSION_IDS){const mission=SIDE_MISSIONS[id];placeButton(`${mission.name} · $${mission.reward}`,()=>startSideMission(id))}
+  placeButton('CONTRACT BOARD · LONG-RANGE ELIMINATIONS',openContractBoard);
   placeButton('BACK',closePlace);
 }
 function startSideMission(id){
@@ -1062,7 +1155,7 @@ function startSideMission(id){
 function finishSideMission(success){
   if(!sideMission)return;
   const result=sideMission;sideMission=null;missionActive=false;missionChase=null;
-  for(const enemy of enemies)scene.remove(enemy.mesh);enemies.length=0;
+  for(const enemy of enemies)scene.remove(enemy.mesh);enemies.length=0;resetCombatFx();
   target=entrance(LANDMARKS.find(p=>p.id==='hub'));routeTarget=null;
   if(success){reward(progress,result.reward);refreshCash();sound('success');showToast(`${result.name} COMPLETE · +$${result.reward}`)}
   else showToast(`${result.name} CANCELLED`);
@@ -1531,11 +1624,14 @@ function animate(){requestAnimationFrame(animate);const elapsed=clock.getDelta()
   }
   if(streetTalkPartner&&placeOpen)applyTalkGesture(streetTalkPartner.mesh,gameTime,1);
  }
- const pos=vehicle?vehicle.mesh.position:player.position,dist=insideHome?5.2:vehicle?11+Math.min(1.8,Math.abs(vehicleSpeed)*.1):(aiming?5.3:6.7),height=(insideHome?3.4:vehicle?5.4:(aiming?2.9:3.35));
+ const pos=vehicle?vehicle.mesh.position:player.position,dist=insideHome?5.2:vehicle?11:(aiming?5.3:6.7),height=(insideHome?3.4:vehicle?5.4:(aiming?2.9:3.35));
  const shoulder=vehicle?0:1.2,forwardX=-Math.sin(cameraYaw),forwardZ=-Math.cos(cameraYaw),rightX=Math.cos(cameraYaw),rightZ=-Math.sin(cameraYaw);
  cameraFocus.set(pos.x,vehicle?1.5:1.65,pos.z);cameraDesired.set(pos.x+Math.sin(cameraYaw)*dist+rightX*shoulder,height,pos.z+Math.cos(cameraYaw)*dist+rightZ*shoulder);if(insideHome){cameraDesired.x=THREE.MathUtils.clamp(cameraDesired.x,-6.4,6.4);cameraDesired.z=THREE.MathUtils.clamp(cameraDesired.z,HOME_CENTER.z-5.9,HOME_CENTER.z+5.9)}
  const cameraRay=cameraDesired.clone().sub(cameraFocus),rayLength=cameraRay.length();raycaster.set(cameraFocus,cameraRay.normalize());raycaster.far=rayLength;const intersections=insideHome?[]:raycaster.intersectObjects(world.buildingMeshes.filter((mesh,i)=>{const b=world.blocks[i];return Math.abs(b.x-pos.x)<b.halfX+rayLength&&Math.abs(b.z-pos.z)<b.halfZ+rayLength}),false);if(intersections.length)cameraDesired.copy(cameraFocus).addScaledVector(cameraRay,Math.max(.7,intersections[0].distance-.5));
- lookPitch*=Math.exp(-5*dt);camera.position.lerp(cameraDesired,1-Math.exp(-dt*(aiming||fireHeld?18:12)));if(shakeUntil>gameTime){const s=(shakeUntil-gameTime)*1.5;camera.position.x+=(Math.random()-.5)*s;camera.position.y+=(Math.random()-.5)*s*.6}const lookTarget=cameraFocus.clone().add(new THREE.Vector3(forwardX*(vehicle?0:7)+rightX*shoulder,.4-lookPitch*12,forwardZ*(vehicle?0:7)+rightZ*shoulder));if(scoped){currentSway=(breathUntil>gameTime?.12:1)*(.05*Math.sin(gameTime*1.35)+.035*Math.sin(gameTime*2.9));lookTarget.x+=rightX*currentSway*3;lookTarget.z+=rightZ*currentSway*3}else currentSway=0;camera.lookAt(lookTarget);const fov=scoped?[43,26,14][scopeZoom]:(aiming&&!vehicle?43:vehicle?Math.min(64,55+Math.abs(vehicleSpeed)*.55):55);if(Math.abs(camera.fov-fov)>.05){camera.fov=THREE.MathUtils.lerp(camera.fov,fov,Math.min(1,dt*8));camera.updateProjectionMatrix()}sun.position.set(pos.x-35,75,pos.z+30);sun.target.position.set(pos.x,0,pos.z);diamond.rotation.y+=dt;diamond.position.y=4+Math.sin(performance.now()*.003)*.3;ring.rotation.z+=dt*.25;renderer.render(scene,camera);
+ lookPitch*=Math.exp(-5*dt);camera.position.lerp(cameraDesired,1-Math.exp(-dt*(aiming||fireHeld?18:12)));if(shakeUntil>gameTime){const s=(shakeUntil-gameTime)*1.5;camera.position.x+=(Math.random()-.5)*s;camera.position.y+=(Math.random()-.5)*s*.6}const lookTarget=cameraFocus.clone().add(new THREE.Vector3(forwardX*(vehicle?0:7)+rightX*shoulder,.4-lookPitch*12,forwardZ*(vehicle?0:7)+rightZ*shoulder));if(scoped){currentSway=(breathUntil>gameTime?.12:1)*(.05*Math.sin(gameTime*1.35)+.035*Math.sin(gameTime*2.9));lookTarget.x+=rightX*currentSway*3;lookTarget.z+=rightZ*currentSway*3}else currentSway=0;camera.lookAt(lookTarget);const fov=scoped?[43,26,14][scopeZoom]:(aiming&&!vehicle?43:55);if(Math.abs(camera.fov-fov)>.05){camera.fov=THREE.MathUtils.lerp(camera.fov,fov,Math.min(1,dt*8));camera.updateProjectionMatrix()}sun.position.set(pos.x-35,75,pos.z+30);sun.target.position.set(pos.x,0,pos.z);diamond.rotation.y+=dt;diamond.position.y=4+Math.sin(performance.now()*.003)*.3;ring.rotation.z+=dt*.25;if(hitFx){hitFx.update(dt);hitFx.updateRagdolls(dt)}
+ if(!sirenFx&&audio)sirenFx=createSiren(audio,audio.destination);
+ sirenFx?.update(gameTime,police.length>0&&!busted&&!ended&&!insideHome,muted?0:.05*sfxVolume);
+ renderer.render(scene,camera);
 }
 renderMapLegend();
 // Test-only controls let automated browser checks exercise the real mission state machine.
@@ -1592,6 +1688,21 @@ if(import.meta.env.DEV) window.__aivmTest={
   radio(){return {track:musicTrack,station:RADIO_STATIONS[musicTrack]||null}},
   mapViewState(){return {...mapView}},
   miniZoomLevel(){return miniZoom},
+  activeContract(){return activeContract?{id:activeContract.id,killed:activeContract.killed,targets:activeContract.targets}:null},
+  arrestState(){return police.map(c=>c.arrest?.phase||'none')},
+  combatFxState(){return {particles:hitFx?.liveCount||0,ragdolls:hitFx?.ragdollCount||0}},
+  startContract(id){startContract(id)},
+  hurtContract(){enemies.filter(e=>e.alive&&e.kind==='contract').forEach(e=>damageEnemy(e,999))},
+  setWanted(n){heat=n;updateHeat();lastSeenByPolice=gameTime;if(heat<2)clearPolice()},
+  teleportToCop(){const cop=police[0];if(!cop)return false;const p=cop.car.mesh.position;
+    for(const [dx,dz] of [[3,0],[-3,0],[0,3],[0,-3],[2.5,2.5],[-2.5,-2.5],[2.5,-2.5],[-2.5,2.5]]){const x=p.x+dx,z=p.z+dz;if(world.blocks.some(b=>Math.abs(x-b.x)<b.halfX+.6&&Math.abs(z-b.z)<b.halfZ+.6))continue;player.position.set(x,0,z);return true}
+    return false},
+  officerCount(){return arrestOfficers.length},
+  copCount(){return police.length},
+  contractState(){return activeContract?{id:activeContract.id,killed:activeContract.killed,targets:activeContract.targets,status:activeContract.status}:null},
+  roofs(){return world.roofs.map(r=>({id:r.id,x:r.x,z:r.z,y:+r.y.toFixed(2)}))},
+  playerY(){return +player.position.y.toFixed(2)},
+  copInfo(){const c=police[0];return c?{d:+c.car.mesh.position.distanceTo(player.position).toFixed(2),sees:!!c.sees,arrest:c.arrest?{...c.arrest}:null,cp:[+c.car.mesh.position.x.toFixed(1),+c.car.mesh.position.z.toFixed(1)]}:null},
   gpsTarget(){return {x:target.x,z:target.z}},
   cameraFov(){return +camera.fov.toFixed(1)},
   cycleRadio(){cycleRadio();return musicTrack},

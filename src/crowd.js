@@ -38,7 +38,7 @@ export function gatherSpots(places = LANDMARKS) {
   });
 }
 
-export const ROLES = ['civilian','civilian-female','civilian-warm','civilian-dark'];
+export const ROLES = ['civilian','civilian-female','civilian-warm','civilian-dark','civilian-elder','civilian-teen','civilian-business','civilian-child'];
 
 // Benches and low walls where a few people always sit and watch the street.
 export const BENCH_SPOTS = [

@@ -285,3 +285,26 @@
 .map-zoom-ui #map-follow{width:auto;padding:0 10px;font-size:11px;font-weight:800}
 #map-zoom-level{min-width:38px;text-align:center;color:#eafff2;font:800 11px Inter,sans-serif;text-shadow:0 1px 3px #000}
 .full-map-wrap canvas{touch-action:none;cursor:grab}
+
+/* ---- Wave 14 ---------------------------------------------------------------
+   Scrolling sub-menus: the overlay itself scrolls and the card centres with
+   auto margins, so nothing is cut off in short (landscape) screens. */
+.settings-modal,.place-overlay,.game-menu-overlay,.arcade-overlay{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;align-items:flex-start}
+.settings-card,.place-card,.game-menu-card,.arcade-panel{margin:auto;max-height:none;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+@media (max-height:500px) and (orientation:landscape){
+  .settings-modal,.place-overlay,.game-menu-overlay{padding:6px}
+  .settings-card,.place-card,.game-menu-card{max-height:calc(100dvh - 12px);overflow-y:auto}
+}
+.settings-card .setting-toggle,.settings-card select,.settings-card button{touch-action:manipulation}
+
+/* Contract text: wraps inside the card, never overlaps neighbouring elements. */
+#place-desc{white-space:pre-line;overflow-wrap:anywhere;word-break:break-word;line-height:1.5;max-width:100%}
+.place-action{white-space:pre-line;overflow-wrap:anywhere;word-break:break-word;line-height:1.35;height:auto;min-height:48px}
+.place-actions{min-width:0}
+
+/* Minimap: sized from the viewport so the full radar frame always fits. */
+.map-wrap{width:clamp(78px,16vmin,128px);height:clamp(78px,16vmin,128px);aspect-ratio:1/1;flex:none}
+.map-wrap canvas{display:block;width:100%;height:100%;touch-action:none}
+.mini-zoom-row{gap:4px;align-items:center}
+.mini-zoom-step{width:24px;height:22px;padding:0;background:#102924f0;border:1px solid #9ad7c89c;border-radius:12px;color:#e6fff7;font:800 13px/1 Inter,sans-serif;pointer-events:auto;touch-action:manipulation}
+.mini-zoom-step:focus-visible{outline:2px solid white;outline-offset:2px}

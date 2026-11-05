@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { LANDMARKS, ROAD_LIMIT, districtAt } from './city-data.js';
 import { addDistrictDecor } from './district-decor.js';
+import { CONTRACTS } from './contracts.js';
 
 // The city is generated locally; licensed character and vehicle models load separately.
 export function createWorld(scene) {
@@ -568,5 +569,20 @@ export function createWorld(scene) {
     else {for(const sx of [-1,1])for(const sz of [-1.5,1.5])wheel(sx*1.4,sz,.52,.4);box(2.8,.75,4.8,body,0,1,0,g);box(2.45,.8,2.35,glass,0,1.73,.15,g);box(2.5,.16,2.4,body,0,2.18,.15,g);for(const sx of [-1,1]){box(.09,.8,2.3,metal,sx*1.2,1.73,.15,g);box(.1,.1,.55,dark,sx*1.43,1.24,.65,g)}box(2.6,.22,.15,dark,0,.7,-2.46,g);for(const x of [-.9,.9]){box(.5,.22,.1,glow,x,1.12,-2.43,g);box(.55,.2,.1,red,x,1.12,2.43,g)}box(2.5,.13,.12,metal,0,.85,2.46,g)}
     g.position.set(x,0,z);scene.add(g);return {type,mesh:g,wheels,length:length||(bike?3.25:4.8)};
   }
-  return {mat,box,blocks,obstacles,buildingMeshes,person,simplePerson,vehicle,stallSpots};
+  // Multi-storey high-rises with a rooftop vantage point for contract work.
+  // Each floor gets a glazed band and trim; the roof has a parapet and a
+  // service box. Players reach the roof by contract teleport, not stairs.
+  const vantageGlass=mat(0x4f6d78,{metalness:.4,roughness:.28}),vantageConcrete=mat(0xa7a9a2),vantageRoof=mat(0x3a4245);
+  const vantagePoints=[];
+  function vantageTower(roof,id){
+    const {x,z,h,w,d,floors}=roof, floorH=h/floors;
+    structure(w,h,d,x,z,vantageConcrete);
+    for(let f=0;f<floors;f++){const y=f*floorH+floorH*.5+.25;box(w+.12,floorH*.5,.14,vantageGlass,x,y,z+d/2+.08,scene,false);box(w+.12,floorH*.5,.14,vantageGlass,x,y,z-d/2-.08,scene,false);box(.14,floorH*.5,d+.12,vantageGlass,x+w/2+.08,y,z,scene,false);box(.14,floorH*.5,d+.12,vantageGlass,x-w/2-.08,y,z,scene,false)}
+    const top=h+.25;box(w+.6,.5,d+.6,vantageRoof,x,top+.25,z,scene,false);
+    for(const [px,pz] of [[-1,-1],[1,-1],[-1,1],[1,1]])box(.22,1,.22,trim,x+px*(w/2),top+1,z+pz*(d/2),scene,false);
+    box(2.4,1.6,2.4,trim,x-w*.2,top+1.05,z+d*.15,scene,false);
+    vantagePoints.push({id,x,z,y:top+.5,halfX:w/2,halfZ:d/2});
+  }
+  for(const contract of CONTRACTS)if(contract.roof)vantageTower(contract.roof,contract.id);
+  return {mat,box,blocks,obstacles,buildingMeshes,person,simplePerson,vehicle,stallSpots,roofs:vantagePoints};
 }

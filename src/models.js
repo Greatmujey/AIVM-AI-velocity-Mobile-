@@ -23,7 +23,7 @@ export function createModels(renderer) {
     const model=cloneSkeleton(gltf.scene);
     // One precomputed mesh LOD per person, rather than rendering all four at once.
     const lod=role==='player'?'player_LOD1':'player_LOD2';
-    const palette={enemy:{outfit:0xad4a3c,skin:0xbd866a,hair:0x302a29},civilian:{outfit:0xb5c5ca,skin:0xbd896b,hair:0x3d3029},'civilian-female':{outfit:0x7797a1,skin:0xa27157,hair:0x262626},'civilian-warm':{outfit:0xbc8567,skin:0xd1a181,hair:0x403027},'civilian-dark':{outfit:0x658471,skin:0x805742,hair:0x252322}};
+    const palette={enemy:{outfit:0xad4a3c,skin:0xbd866a,hair:0x302a29},civilian:{outfit:0xb5c5ca,skin:0xbd896b,hair:0x3d3029},'civilian-female':{outfit:0x7797a1,skin:0xa27157,hair:0x262626},'civilian-warm':{outfit:0xbc8567,skin:0xd1a181,hair:0x403027},'civilian-dark':{outfit:0x658471,skin:0x805742,hair:0x252322},'civilian-elder':{outfit:0x8a9a8f,skin:0x9c6e52,hair:0xc4c4c4},'civilian-teen':{outfit:0xd9735a,skin:0xc99673,hair:0x1e1a18},'civilian-business':{outfit:0x2f3b4a,skin:0xa9765a,hair:0x1c1a19},'civilian-child':{outfit:0xe2c35c,skin:0xc4906e,hair:0x5a3b25},officer:{outfit:0x1f3f7a,skin:0xb98a68,hair:0x221d1c}};
     const flashMaterials=[];model.traverse(o=>{if(/^player_LOD[0-3]$/.test(o.name))o.visible=o.name===lod;if(o.isMesh){o.castShadow=true;o.receiveShadow=true;
       // The new character has separate MakeHuman meshes; correct their alpha
       // modes so skin/clothes don't render transparent while hair stays cut out.
@@ -36,7 +36,9 @@ export function createModels(renderer) {
       }
       const color=palette[role]?.[o.material?.name];if(color!==undefined){o.material=o.material.clone();o.material.color.setHex(color);if(role==='enemy'&&o.material.name==='outfit')flashMaterials.push(o.material)}}});
     const bounds=new THREE.Box3().setFromObject(model),size=bounds.getSize(new THREE.Vector3());
-    const scale=2.5/size.y,visual=new THREE.Group();visual.rotation.y=Math.PI;
+    // Age and build: elders and teens are a touch shorter, children much smaller.
+    const ageScale={'civilian-elder':.95,'civilian-teen':.92,'civilian-child':.72}[role]??1;
+    const scale=2.5/size.y*ageScale,visual=new THREE.Group();visual.rotation.y=Math.PI;
     model.scale.setScalar(scale);model.position.y=-bounds.min.y*scale;visual.add(model);
     visual.userData.flashMaterials=flashMaterials;
     const mixer=new THREE.AnimationMixer(model), actions={};
