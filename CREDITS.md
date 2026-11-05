@@ -27,3 +27,22 @@ All assets below are included locally; they are not taken from GTA or Call of Du
 ## Original vocal recordings (wave 7)
 
 - `public/assets/audio/vocal-coast.mp3` and `vocal-night.mp3` are original spoken-word vocal hooks written for AIVM and recorded with Arena text-to-speech voices chosen by the project owner. They layer over the generated live-band instrumentation on Coast Drive and Night Cruise. All lyrics are original project writing.
+
+## Real songs on the radio (wave 9)
+
+The "REAL SONGS · AFRO LIVE" radio stations play actual recorded music — six
+instrumental Afro-fusion / African-groove songs:
+
+| Station | Track | File |
+| --- | --- | --- |
+| AFRO LIVE · UMLUNGU | Umlungu | `public/assets/music/afro-umlungu.mp3` |
+| KWELA JIVE RADIO | A Kwela Fella | `public/assets/music/afro-kwela.mp3` |
+| IYANETHA FM | Iyanetha | `public/assets/music/afro-iyanetha.mp3` |
+| VILLAGE GROOVE RADIO | Happy African Village | `public/assets/music/afro-village.mp3` |
+| AFRICAN MOON FM | African Moon | `public/assets/music/afro-moon.mp3` |
+| WEST AFRICA RADIO | West in Africa | `public/assets/music/afro-west.mp3` |
+
+All six are by **John Bartmann**, released under **CC0 1.0 (public domain)** —
+free for any use with no attribution required (credit given here as courtesy).
+Sourced via chosic.com and the SoundSafari/CC0-1.0-Music corpus on GitHub.
+No copyrighted commercial recordings are used anywhere in this project.
