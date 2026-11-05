@@ -80,3 +80,14 @@ test('a pedestrian is under a car only inside its footprint, at any heading', ()
   assert.equal(carFootprintHit(turned, 0, 2), false, 'side after turning');
   assert.equal(carFootprintHit({ ...car, type: 'bike' }, 1.5, 0), false, 'bikes are narrower');
 });
+
+import { zoomIntoPlayer, MAP_BOUND } from '../src/full-map.js';
+test('zooming in from the full map keeps a city-edge player on screen', () => {
+  const centre = { x: -128, z: 133 };
+  const view = zoomIntoPlayer({ zoom: 1, cx: 0, cz: 0 }, 1.5, centre);
+  assert.ok(Math.abs(centre.x - view.cx) < MAP_BOUND / view.zoom, 'x on screen');
+  assert.ok(Math.abs(centre.z - view.cz) < MAP_BOUND / view.zoom, 'z on screen');
+  const deep = zoomIntoPlayer(view, 1.5, centre);
+  assert.ok(Math.abs(centre.x - deep.cx) < MAP_BOUND / deep.zoom, 'still on screen after more zoom');
+  assert.ok(Math.abs(centre.z - deep.cz) < MAP_BOUND / deep.zoom, 'z still on screen');
+});

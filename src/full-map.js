@@ -96,3 +96,11 @@ export function drawFullMap(canvas, { blocks, position, target, route, enemies, 
   const player=point(position);ctx.save();ctx.translate(player.x,player.y);if(!headingUp)ctx.rotate(-cameraYaw);ctx.beginPath();ctx.moveTo(0,-15);ctx.lineTo(10,10);ctx.lineTo(0,6);ctx.lineTo(-10,10);ctx.closePath();ctx.fillStyle='#fff';ctx.strokeStyle='#1a251b';ctx.lineWidth=3;ctx.fill();ctx.stroke();ctx.restore();
   if (headingUp) ctx.restore();
 }
+
+// Zoom in on the player: the zoom centre follows them (clamped to the city
+// bounds), so an edge position stays on screen however far you zoom.
+export function zoomIntoPlayer(view, factor, centre) {
+  const v = clampMapView(view);
+  if (!(factor > 1)) return zoomMapView(v, factor, 0.5, 0.5, 1); // zooming out keeps the centre
+  return clampMapView({ zoom: Math.min(MAP_MAX_ZOOM, v.zoom * factor), cx: centre.x, cz: centre.z });
+}

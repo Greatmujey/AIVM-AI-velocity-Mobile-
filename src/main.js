@@ -3,7 +3,7 @@ import { createWorld } from './world.js';
 import { createModels, animatePerson, animateAnimal, setHitFlash, updateWeapon, setCivilianLOD } from './models.js';
 import { selectReticleTarget } from './combat.js';
 import { roadRoute } from './gps.js';
-import { drawFullMap, MAP_BOUND, screenToWorld, zoomMapView, clampMapView } from './full-map.js';
+import { drawFullMap, MAP_BOUND, screenToWorld, zoomMapView, clampMapView, zoomIntoPlayer } from './full-map.js';
 import { loadPreferences, savePreferences } from './preferences.js';
 import { advancePursuit } from './pursuit.js';
 import { turnTowards } from './locomotion.js';
@@ -1079,7 +1079,7 @@ $('teleport-button').onclick=()=>openTeleport();$('menu-map').onclick=()=>setMap
 // Drag to pan, pinch (or wheel) to zoom, buttons for thumb-friendly zooming.
 const fullMapCanvas=$('full-map');
 function mapZoomAt(factor,clientX,clientY){const rect=fullMapCanvas.getBoundingClientRect();mapView=zoomMapView(mapView,factor,(clientX-rect.left)/rect.width*fullMapCanvas.width,(clientY-rect.top)/rect.height*fullMapCanvas.height,fullMapCanvas.width);mapMoved=true;redrawMap()}
-function mapZoomButton(factor){const rect=fullMapCanvas.getBoundingClientRect();mapZoomAt(factor,rect.left+rect.width/2,rect.top+rect.height/2)}
+function mapZoomButton(factor){mapView=zoomIntoPlayer(mapView,factor,mapCentre());mapMoved=true;redrawMap()}
 $('map-zoom-in').onclick=()=>mapZoomButton(1.5);$('map-zoom-out').onclick=()=>mapZoomButton(1/1.5);
 $('map-follow').onclick=()=>{const p=mapCentre();mapView=clampMapView({zoom:Math.max(mapView.zoom,2.2),cx:p.x,cz:p.z});redrawMap();showToast('MAP CENTRED ON YOU')};
 function setMiniZoom(value,toast=true){miniZoom=Math.max(.5,Math.min(3,+value.toFixed(2)));$('mini-zoom').textContent=`🔍 ${miniZoom}×`;updateMap();if(started&&toast)showToast(`MINIMAP ZOOM · ${miniZoom}×`)}
