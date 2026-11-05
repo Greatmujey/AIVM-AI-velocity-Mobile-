@@ -358,3 +358,15 @@ export function crowdCount(agents) {
   for (const agent of agents) byDistrict[agent.district] = (byDistrict[agent.district] || 0) + 1;
   return {total:agents.length, byDistrict};
 }
+
+// Whether a pedestrian at (px, pz) is under a moving car's footprint. The car
+// faces (-sin yaw, -cos yaw); half-widths are generous so a clip still counts.
+export function carFootprintHit(car, px, pz) {
+  const halfWidth = (car.type === 'bike' ? .55 : 1.3) + .4;
+  const halfLength = (car.type === 'bike' ? 1.5 : 2.35) + .4;
+  const dx = px - car.x, dz = pz - car.z;
+  const c = Math.cos(car.yaw), s = Math.sin(car.yaw);
+  const lateral = dx * c - dz * s;
+  const along = -dx * s - dz * c;
+  return Math.abs(lateral) < halfWidth && Math.abs(along) < halfLength;
+}

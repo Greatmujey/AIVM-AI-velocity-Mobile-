@@ -67,3 +67,16 @@ test('screen fade is derived from the phase every frame', () => {
   assert.equal(fadeLevel('close'), 0);
   assert.equal(fadeLevel('done'), 0);
 });
+
+import { carFootprintHit } from '../src/crowd.js';
+test('a pedestrian is under a car only inside its footprint, at any heading', () => {
+  const car = { x: 0, z: 0, yaw: 0, type: 'sedan' };
+  assert.equal(carFootprintHit(car, 0, -2), true, 'directly ahead');
+  assert.equal(carFootprintHit(car, 1.2, 0), true, 'beside the wheel line');
+  assert.equal(carFootprintHit(car, 3, 0), false, 'well outside the width');
+  assert.equal(carFootprintHit(car, 0, -6), false, 'far ahead');
+  const turned = { ...car, yaw: Math.PI / 2 };
+  assert.equal(carFootprintHit(turned, -2, 0), true, 'ahead after turning 90 degrees');
+  assert.equal(carFootprintHit(turned, 0, 2), false, 'side after turning');
+  assert.equal(carFootprintHit({ ...car, type: 'bike' }, 1.5, 0), false, 'bikes are narrower');
+});

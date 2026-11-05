@@ -98,7 +98,16 @@ export function createModels(renderer) {
       vehicle.mesh.add(rider);vehicle.rider=rider;rider.visible=!!vehicle.occupied;
     }
   }
-  return { person, vehicle, animal };
+  // Hand a pedestrian back to its procedural placeholder when it walks far
+  // away, so the human-model budget is spent on people near the camera.
+  function release(group) {
+    const visual = group.userData.model;
+    if (!visual) return;
+    group.remove(visual);
+    for (const child of group.children) if (!child.userData.persist) child.visible = true;
+    group.userData.model = null; group.userData.animation = null;
+  }
+  return { person, vehicle, animal, release };
 }
 export function personAnimationName(role, amount, shooting=false, aiming=false, sprinting=false) {
   if (shooting) return 'fire';

@@ -9,7 +9,7 @@ import { advancePursuit } from './pursuit.js';
 import { turnTowards } from './locomotion.js';
 import { LANDMARKS, DISTRICTS, entrance, ROAD_LIMIT, MAP_LETTERS, DISTRICT_LETTERS, mapLetter, landmarkById, districtById, districtAt } from './city-data.js';
 import { VEHICLE_CATALOG, vehicleById, applyCatalog, tintFor, handlingFor, dealershipStock, raceClassOf, DEALERSHIP_NAME } from './vehicles.js';
-import { createCrowd, stepCrowd, nearestConversations, crowdCount, mulberry32 } from './crowd.js';
+import { createCrowd, stepCrowd, nearestConversations, crowdCount, mulberry32, carFootprintHit } from './crowd.js';
 import { applyTalkGesture } from './gestures.js';
 import { createBubbles } from './bubbles.js';
 import { streetConversation, applyStreetEffect, nearestLandmarkId } from './street-talk.js';
@@ -161,8 +161,7 @@ for(const [i,road] of [-112,-84,-56,-28,0,28,56,84,112].entries()){
 // People walk the pavement lanes, loiter around every door, sit on benches,
 // shout from market stalls and stop to talk face to face in pairs.
 const civilians=createCrowd({seed:20260});
-const CROWD_MODEL_DISTANCE=27, CROWD_VIEW_DISTANCE=64, CROWD_MODEL_BUDGET=22;
-let crowdModelsLoaded=0;
+const CROWD_MODEL_DISTANCE=27, CROWD_VIEW_DISTANCE=64, CROWD_MODEL_BUDGET=30, CROWD_MODEL_RELEASE=CROWD_MODEL_DISTANCE+12;
 for(const [i,c] of civilians.entries()){
   const mesh=world.simplePerson(0x718b94);mesh.position.set(c.x,0,c.z);mesh.rotation.y=c.ry;mesh.visible=false;scene.add(mesh);
   c.mesh=mesh;c.walk=i*1.7;c.requested=false;c.animElapsed=0;c.ejected=false;
@@ -229,11 +228,14 @@ function updateCity(dt,playerPos){
  }
  // One crowd step drives walking, loitering, sitting and conversations.
  stepCrowd(civilians,dt,{time:gameTime,focus:playerPos,flee:fireHeld&&!insideHome,viewDistance:CROWD_VIEW_DISTANCE+16,random:cityRandom});
+ let modelsInUse=civilians.reduce((n,o)=>n+(o.requested?1:0),0);
  for(const c of civilians){
   const p=c.mesh.position,distance=Math.hypot(c.x-playerPos.x,c.z-playerPos.z);
   p.x=c.x;p.z=c.z;c.mesh.rotation.y=c.ry;
   c.mesh.visible=distance<CROWD_VIEW_DISTANCE&&!insideHome;
-  if(c.mesh.visible&&!c.requested&&distance<CROWD_MODEL_DISTANCE&&crowdModelsLoaded<CROWD_MODEL_BUDGET){c.requested=true;crowdModelsLoaded++;models.person(c.mesh,c.role)}
+  // The budget is concurrent: people who walk away give their model back.
+  if(c.requested&&distance>CROWD_MODEL_RELEASE&&c.mesh.userData.model){models.release(c.mesh);c.requested=false;modelsInUse--}
+  if(c.mesh.visible&&!c.requested&&distance<CROWD_MODEL_DISTANCE&&modelsInUse<CROWD_MODEL_BUDGET){c.requested=true;modelsInUse++;models.person(c.mesh,c.role)}
   if(!c.mesh.visible||c.dead)continue;
   c.walk+=dt;c.animElapsed+=dt;
   const talking=c.mode==='talk'||c.mode==='vendor'||c.mode==='sit';
@@ -945,6 +947,19 @@ function nearestAnyTarget(){
  const hitEnemy=selectReticleTarget(candidates,aimAssist?Math.min(innerWidth,innerHeight)*(aiming?.045:.065):0);
  if(!hitEnemy)return null;
  const wrap=pool.find(p=>p.enemy===hitEnemy);return {ref:hitEnemy,civ:!!wrap?.civ};
+}
+// A moving car knocks down any pedestrian under it: same ragdoll as a shot,
+// but the car pays double what a shot bystander's wallet does.
+const RUN_DOWN_PAY=60;
+function runOverCivilians(vehicle){
+ const p=vehicle.mesh.position;
+ for(const c of civilians){
+  if(c.dead||!c.mesh.visible||!carFootprintHit({x:p.x,z:p.z,yaw:vehicle.mesh.rotation.y,type:vehicle.type},c.x,c.z))continue;
+  c.dead=true;deathFx(c.mesh,p);
+  reward(progress,RUN_DOWN_PAY);saveProgress(storage,progress);refreshCash();showToast(`RUN DOWN · +$${RUN_DOWN_PAY}`);
+  heat=Math.min(3,heat+1);updateHeat();lastCrimeReport=gameTime;lastSeenByPolice=gameTime;
+  for(const other of civilians){if(other.dead||other===c||!other.mesh.visible)continue;if(Math.hypot(other.x-c.x,other.z-c.z)<14){other.hostileUntil=gameTime+25;other.hostileCd=.8+Math.random();other.mode='talk';other.line='MAN DOWN!';other.lineUntil=gameTime+2}}
+ }
 }
 function damageCivilian(c,amount){
  if(c.dead)return;c.hp=(c.hp??100)-amount;setHitFlash(c.mesh,true);setTimeout(()=>setHitFlash(c.mesh,false),100);$('hitmarker').classList.add('active');setTimeout(()=>$('hitmarker').classList.remove('active'),100);
@@ -1686,6 +1701,7 @@ function animate(){requestAnimationFrame(animate);const elapsed=clock.getDelta()
    if(Math.abs(vehicleSpeed)>.25)vehicle.mesh.rotation.y-=inputX*dt*handling.steer*(.6+steerSensitivity*.08)*Math.min(Math.abs(vehicleSpeed)/5,1)*(1-.3*Math.min(1,Math.abs(vehicleSpeed)/(handling.top||18)))*(vehicleSpeed>=0?1:-1);
    const dx=-Math.sin(vehicle.mesh.rotation.y)*vehicleSpeed*dt,dz=-Math.cos(vehicle.mesh.rotation.y)*vehicleSpeed*dt;
    if(movePosition(vehicle.mesh.position,dx,dz,drivingObstacles(),.75)<Math.hypot(dx,dz)*.4)vehicleSpeed*=.35;
+   if(Math.abs(vehicleSpeed)>2)runOverCivilians(vehicle);
    for(const wheel of vehicle.wheels)wheel.rotation.x-=vehicleSpeed*dt*.8;if(vehicle.type==='bike'){const lean=-inputX*Math.min(Math.abs(vehicleSpeed)/12,1)*.22;if(vehicle.visual)vehicle.visual.rotation.z=THREE.MathUtils.lerp(vehicle.visual.rotation.z,lean,Math.min(1,dt*6));if(vehicle.rider)vehicle.rider.rotation.z=THREE.MathUtils.lerp(vehicle.rider.rotation.z,lean,Math.min(1,dt*6))}player.position.copy(vehicle.mesh.position);if(Math.abs(vehicleSpeed)>1&&gameTime-lastEngineSound>.28){sound('engine');lastEngineSound=gameTime}
    if(lookPointer===null&&Math.abs(vehicleSpeed)>1){let delta=Math.atan2(Math.sin(vehicle.mesh.rotation.y-cameraYaw),Math.cos(vehicle.mesh.rotation.y-cameraYaw));cameraYaw+=delta*(1-Math.exp(-dt*2.4))}
   }else{
@@ -1746,7 +1762,7 @@ renderMapLegend();
 // Test-only controls let automated browser checks exercise the real mission state machine.
 if(import.meta.env.DEV) window.__aivmTest={
   warp(x,z){const p=vehicle?vehicle.mesh.position:player.position;p.set(x,0,z);if(vehicle)player.position.copy(p);vehicleSpeed=0},
-  state(){const pos=vehicle?vehicle.mesh.position:player.position;return {mission,phase,kills,health,insideHome,missionActive,selectedDistrict:selectedDistrict.id,activity:activity?{id:activity.id,step:activity.step,remaining:activity.remaining}:null,gameMenuOpen,casinoOpen,interior:insideHome?interiorPlace.id:null,money:progress.money,owned:[...progress.owned],placeOpen,settingsOpen,vehicle:vehicle?.type||null,weapon:weapons[weaponIndex].name,ammo:ammo[weaponIndex],ammoAll:[...ammo],reloading:!!reloadEnd,gasHeld,brakeHeld,weaponMenuOpen,mapOpen,dropKills,rival:rival?{x:rival.car.mesh.position.x,z:rival.car.mesh.position.z}:null,ended,x:pos.x,z:pos.z,cameraYaw,lookPitch,aiming,fireHeld,assist:aimAssist}},
+  state(){const pos=vehicle?vehicle.mesh.position:player.position;return {vehicleYaw:vehicle?vehicle.mesh.rotation.y:null,mission,phase,kills,health,insideHome,missionActive,selectedDistrict:selectedDistrict.id,activity:activity?{id:activity.id,step:activity.step,remaining:activity.remaining}:null,gameMenuOpen,casinoOpen,interior:insideHome?interiorPlace.id:null,money:progress.money,owned:[...progress.owned],placeOpen,settingsOpen,vehicle:vehicle?.type||null,weapon:weapons[weaponIndex].name,ammo:ammo[weaponIndex],ammoAll:[...ammo],reloading:!!reloadEnd,gasHeld,brakeHeld,weaponMenuOpen,mapOpen,dropKills,rival:rival?{x:rival.car.mesh.position.x,z:rival.car.mesh.position.z}:null,ended,x:pos.x,z:pos.z,cameraYaw,lookPitch,aiming,fireHeld,assist:aimAssist}},
   people(){return civilians.map(c=>({id:c.id,x:c.mesh.position.x,z:c.mesh.position.z,ry:c.ry,mode:c.mode,district:c.district,line:c.line,visible:c.mesh.visible,model:!!c.mesh.userData.model}))},
   interiorState(){const id=interiorPlace.id;return {id,time:+gameTime.toFixed(1),agents:(interiorLife[id]||[]).map(a=>({mode:a.mode,x:+a.x.toFixed(2),z:+a.z.toFixed(2),ry:+a.ry.toFixed(2),wait:+a.wait.toFixed(2),think:+a.think.toFixed(1),partner:a.partner}))}},
   doorTraffic(){return civilians.filter(c=>c.doorful).length},
@@ -1783,7 +1799,7 @@ if(import.meta.env.DEV) window.__aivmTest={
   startSoloRace(id=null,cls=null){if(cls)raceClass=normalizeRaceClass(cls);raceTrackId=id||(race&&race.trackId)||defaultTrackFor(raceClass);if(classOfTrack(raceTrackId)!==raceClass)raceClass=classOfTrack(raceTrackId);startSoloRace()},
   raceClass(){return {selected:raceClass,live:race?currentRaceClass():null,track:raceTrackId,tracks:tracksForClass(raceClass)}},
   setRaceClass(cls){setRaceClass(cls)},
-  crowdState(){const counts=crowdCount(civilians);return {...counts,talking:civilians.filter(c=>c.mode==='talk').length,vendors:civilians.filter(c=>c.mode==='vendor').length,sitting:civilians.filter(c=>c.mode==='sit').length,models:crowdModelsLoaded,near:civilians.filter(c=>c.mesh.visible).length}},
+  crowdState(){const counts=crowdCount(civilians);return {...counts,talking:civilians.filter(c=>c.mode==='talk').length,vendors:civilians.filter(c=>c.mode==='vendor').length,sitting:civilians.filter(c=>c.mode==='sit').length,models:civilians.filter(c=>c.requested).length,near:civilians.filter(c=>c.mesh.visible).length}},
   talkNearest(){const person=nearestPerson();if(!person)return null;openStreetConversation(person);return {name:streetName(person),x:person.x,z:person.z,district:person.district,options:[...$('place-actions').children].map(b=>b.textContent)}},
   conversationOptions(){return [...$('place-actions').children].map(b=>b.textContent)},
   pickOption(index){const buttons=[...$('place-actions').children];buttons[index]?.click();return buttons[index]?.textContent||null},
