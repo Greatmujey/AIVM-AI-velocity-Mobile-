@@ -6,7 +6,7 @@ export function worldToMap(x, z, size, bound = MAP_BOUND) {
   return { x: (x + bound) * size / (bound * 2), y: (z + bound) * size / (bound * 2) };
 }
 
-export function drawFullMap(canvas, { blocks, position, target, route, enemies, vehicles, cameraYaw, headingUp = false }) {
+export function drawFullMap(canvas, { blocks, position, target, route, enemies, vehicles, cameraYaw, headingUp = false, pickups = [] }) {
   const ctx = canvas.getContext('2d'), size = canvas.width, scale = size / (MAP_BOUND * 2);
   const point = p => worldToMap(p.x, p.z, size);
   ctx.clearRect(0, 0, size, size);
@@ -48,6 +48,12 @@ export function drawFullMap(canvas, { blocks, position, target, route, enemies, 
   // Parked and occupied rideable vehicles, live enemies and the current objective.
   for (const v of vehicles) {
     const p = point(v.mesh.position); ctx.fillStyle = '#72cbeb'; ctx.fillRect(p.x-6,p.y-6,12,12);
+  }
+  // Floating street gifts, coloured by what they give.
+  for (const gift of pickups) {
+    const p = point(gift); ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#' + (gift.color ?? 0xffd166).toString(16).padStart(6, '0'); ctx.fill();
+    ctx.strokeStyle = '#172a25'; ctx.lineWidth = 1.5; ctx.stroke();
   }
   ctx.fillStyle = '#ff806d';
   for (const e of enemies) if (e.alive) { const p=point(e.mesh.position); ctx.beginPath();ctx.arc(p.x,p.y,6,0,Math.PI*2);ctx.fill(); }

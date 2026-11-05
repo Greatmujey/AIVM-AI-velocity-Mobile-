@@ -23,7 +23,7 @@ export const SONG_IDS = Object.keys(SONGS);
 export function createSongRadio(ctx) {
   const base = import.meta.env?.BASE_URL ?? '/';
   const buffers = new Map();
-  let gain = null, src = null, current = null, failed = new Set();
+  let gain = null, src = null, srcGain = null, current = null, failed = new Set();
 
   function ensureGain() {
     if (!gain) { gain = ctx.createGain(); gain.gain.value = 0; gain.connect(ctx.destination) }
@@ -37,25 +37,37 @@ export function createSongRadio(ctx) {
     buffers.set(id, buffer);
     return buffer;
   }
-  function stopSrc() {
-    if (src) { try { src.onended = null; src.stop() } catch { /* already stopped */ } try { src.disconnect() } catch { /* noop */ } src = null }
+  function stopSrc(fade = 0) {
+    if (!src) return;
+    const now = ctx.currentTime;
+    try {
+      if (fade > 0 && srcGain) {
+        srcGain.gain.cancelScheduledValues(now); srcGain.gain.setValueAtTime(srcGain.gain.value, now);
+        srcGain.gain.linearRampToValueAtTime(0, now + fade); src.stop(now + fade + .05);
+      } else src.stop();
+    } catch { /* already stopped */ }
+    try { src.disconnect() } catch { /* noop */ }
+    if (srcGain) try { srcGain.disconnect() } catch { /* noop */ }
+    src = null; srcGain = null;
   }
 
   return {
     // Called every frame. `id` is a SONGS key, or null/anything else to stop.
     update(id, volume, muted) {
-      if (!id || !SONGS[id]) { if (current) { stopSrc(); current = null } return }
+      if (!id || !SONGS[id]) { if (current) { stopSrc(.25); current = null } return }
       const g = ensureGain();
       g.gain.value = muted ? 0 : Math.min(1, Math.max(0, volume) * 1.6);
       if (current === id) {
         if (!muted && ctx.state === 'suspended') { try { ctx.resume() } catch { /* autoplay guard */ } }
         return;
       }
-      current = id; stopSrc();
+      current = id; stopSrc(.3);
       load(id).then(buffer => {
         if (current !== id) return;
+        const now = ctx.currentTime, fadeGain = ctx.createGain();
+        fadeGain.gain.setValueAtTime(0, now); fadeGain.gain.linearRampToValueAtTime(1, now + .7); fadeGain.connect(g);
         const s = ctx.createBufferSource();
-        s.buffer = buffer; s.loop = true; s.connect(g); s.start(); src = s;
+        s.buffer = buffer; s.loop = true; s.connect(fadeGain); s.start(); src = s; srcGain = fadeGain;
       }).catch(error => {
         failed.add(id);
         if (current === id) current = null;
