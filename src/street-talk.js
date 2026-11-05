@@ -7,7 +7,7 @@ import { mulberry32 } from './crowd.js';
 export const SNACK_PRICE = 20;
 export const WATER_PRICE = 10;
 export const STREET_BET = 100;
-export const STREET_BET_PRIZE = 260;
+export const STREET_BET_PRIZE = 350;
 
 const TIPS = {
   city:[

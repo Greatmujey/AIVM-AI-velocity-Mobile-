@@ -3,7 +3,7 @@
 // A step either reaches a place, clears enemies, or follows a vehicle.
 export const SIDE_MISSIONS = {
   patrol: {
-    name:'NIGHT PATROL', description:'Walk the waterfront beats and check every alley.', reward:600,
+    name:'NIGHT PATROL', description:'Walk the waterfront beats and check every alley.', reward:900,
     steps:[
       {kind:'reach', label:'Check the harbour alley', point:{x:-56,z:-56}},
       {kind:'clear', label:'Clear the loiterers', count:3, spawns:[[-56,-62],[-63,-56],[-49,-58]]},
@@ -11,7 +11,7 @@ export const SIDE_MISSIONS = {
     ],
   },
   chase: {
-    name:'RUNAWAY COURIER', description:'A stolen van is heading for the hills. Catch it.', reward:800,
+    name:'RUNAWAY COURIER', description:'A stolen van is heading for the hills. Catch it.', reward:1100,
     steps:[
       {kind:'chase', label:'Catch the stolen van', target:{x:56,z:-56}, follow:[[56,-56],[84,-56],[112,-56],[112,-84],[112,-112]]},
       {kind:'reach', label:'Recover the parcel at the overlook', point:{x:112,z:-112}},
@@ -19,7 +19,7 @@ export const SIDE_MISSIONS = {
     ],
   },
   guard: {
-    name:'SHOP WATCH', description:'Guard the Palm Grove shop through the evening rush.', reward:700,
+    name:'SHOP WATCH', description:'Guard the Palm Grove shop through the evening rush.', reward:1000,
     steps:[
       {kind:'reach', label:'Get to the shop front', point:{x:42,z:50}},
       {kind:'clear', label:'Hold off the break-in crew', count:4, spawns:[[36,50],[42,56],[48,50],[42,44]]},
@@ -27,7 +27,7 @@ export const SIDE_MISSIONS = {
     ],
   },
   delivery: {
-    name:'DESERT RUN', description:'Long haul out to the desert settlement and back.', reward:500,
+    name:'DESERT RUN', description:'Long haul out to the desert settlement and back.', reward:800,
     steps:[
       {kind:'reach', label:'Collect crates at the village', point:{x:112,z:84}},
       {kind:'reach', label:'Cross to the sandy outskirts', point:{x:-112,z:84}},

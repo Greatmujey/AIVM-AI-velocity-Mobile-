@@ -28,8 +28,8 @@ export const trackById = id => RACE_TRACKS[id] || null;
 
 // Two racing disciplines. Bikes get their own tracks, prizes and handling.
 export const RACE_CLASSES = {
-  car: {id:'car', label:'CAR RACES', short:'CARS', blurb:'Five-car grids on the city circuits.', prizes:[400,250,150]},
-  bike: {id:'bike', label:'BIKE RACES', short:'BIKES', blurb:'Bike-only courses: tighter turns, quicker starts.', prizes:[300,200,120]},
+  car: {id:'car', label:'CAR RACES', short:'CARS', blurb:'Five-car grids on the city circuits.', prizes:[600,380,220]},
+  bike: {id:'bike', label:'BIKE RACES', short:'BIKES', blurb:'Bike-only courses: tighter turns, quicker starts.', prizes:[500,320,190]},
 };
 export const RACE_CLASS_IDS = Object.keys(RACE_CLASSES);
 export function normalizeRaceClass(value) { return String(value || '').trim().toLowerCase() === 'bike' ? 'bike' : 'car'; }

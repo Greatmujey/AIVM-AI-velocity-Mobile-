@@ -77,5 +77,5 @@ test('a bike lobby still holds 2-5 racers and finishes the same way',()=>{
   updateRoomClock(room,COUNTDOWN_MS+1);
   assert.equal(room.status,'finished');
   assert.equal(standings(room)[0].id,'bot-1');
-  assert.equal(prizeFor('bike',1),300);
+  assert.equal(prizeFor('bike',1),500);
 });

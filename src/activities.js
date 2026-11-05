@@ -1,9 +1,9 @@
 // Repeatable, solo jobs. All checkpoints are on the existing road grid.
 export const ACTIVITIES = {
-  coast:{title:'COASTAL COURIER',description:'Deliver supplies through the village.',reward:300,points:[{x:84,z:56},{x:112,z:84}]},
-  port:{title:'PORT DISPATCH',description:'Deliver a package to South Port.',reward:400,points:[{x:-84,z:-56},{x:-112,z:-84}]},
-  carRace:{title:'CITY CAR TIME TRIAL',description:'Drive a car through the checkpoints.',reward:500,vehicle:'car',seconds:180,points:[{x:0,z:0},{x:0,z:-56},{x:56,z:-56},{x:56,z:0}]},
-  bikeRace:{title:'BIKE TIME TRIAL',description:'Ride a bike through the checkpoints.',reward:500,vehicle:'bike',seconds:180,points:[{x:0,z:0},{x:-56,z:0},{x:-56,z:56},{x:0,z:56}]},
+  coast:{title:'COASTAL COURIER',description:'Deliver supplies through the village.',reward:450,points:[{x:84,z:56},{x:112,z:84}]},
+  port:{title:'PORT DISPATCH',description:'Deliver a package to South Port.',reward:550,points:[{x:-84,z:-56},{x:-112,z:-84}]},
+  carRace:{title:'CITY CAR TIME TRIAL',description:'Drive a car through the checkpoints.',reward:700,vehicle:'car',seconds:180,points:[{x:0,z:0},{x:0,z:-56},{x:56,z:-56},{x:56,z:0}]},
+  bikeRace:{title:'BIKE TIME TRIAL',description:'Ride a bike through the checkpoints.',reward:700,vehicle:'bike',seconds:180,points:[{x:0,z:0},{x:-56,z:0},{x:-56,z:56},{x:0,z:56}]},
 };
 export function advanceActivity(activity,position,vehicleType,dt) {
   if(activity.seconds){activity.remaining=Math.max(0,activity.remaining-dt);if(activity.remaining===0)return 'expired'}

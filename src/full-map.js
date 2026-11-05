@@ -6,11 +6,12 @@ export function worldToMap(x, z, size, bound = MAP_BOUND) {
   return { x: (x + bound) * size / (bound * 2), y: (z + bound) * size / (bound * 2) };
 }
 
-export function drawFullMap(canvas, { blocks, position, target, route, enemies, vehicles, cameraYaw }) {
+export function drawFullMap(canvas, { blocks, position, target, route, enemies, vehicles, cameraYaw, headingUp = false }) {
   const ctx = canvas.getContext('2d'), size = canvas.width, scale = size / (MAP_BOUND * 2);
   const point = p => worldToMap(p.x, p.z, size);
   ctx.clearRect(0, 0, size, size);
   ctx.fillStyle = '#314640'; ctx.fillRect(0, 0, size, size);
+  if (headingUp) { const pp = point(position); ctx.save(); ctx.translate(pp.x, pp.y); ctx.rotate(cameraYaw); ctx.translate(-pp.x, -pp.y); }
   // District backgrounds follow the actual north/south division in world.js.
   const band = (top, bottom, color) => { ctx.fillStyle = color; ctx.fillRect(0, point({x:0,z:top}).y, size, (bottom-top)*scale); };
   band(-MAP_BOUND, MAP_BOUND, '#777d67');
@@ -51,5 +52,6 @@ export function drawFullMap(canvas, { blocks, position, target, route, enemies, 
   ctx.fillStyle = '#ff806d';
   for (const e of enemies) if (e.alive) { const p=point(e.mesh.position); ctx.beginPath();ctx.arc(p.x,p.y,6,0,Math.PI*2);ctx.fill(); }
   const goal=point(target); ctx.save();ctx.translate(goal.x,goal.y);ctx.rotate(Math.PI/4);ctx.fillStyle='#c9fc51';ctx.strokeStyle='#1a251b';ctx.lineWidth=3;ctx.fillRect(-10,-10,20,20);ctx.strokeRect(-10,-10,20,20);ctx.restore();
-  const player=point(position);ctx.save();ctx.translate(player.x,player.y);ctx.rotate(-cameraYaw);ctx.beginPath();ctx.moveTo(0,-15);ctx.lineTo(10,10);ctx.lineTo(0,6);ctx.lineTo(-10,10);ctx.closePath();ctx.fillStyle='#fff';ctx.strokeStyle='#1a251b';ctx.lineWidth=3;ctx.fill();ctx.stroke();ctx.restore();
+  const player=point(position);ctx.save();ctx.translate(player.x,player.y);if(!headingUp)ctx.rotate(-cameraYaw);ctx.beginPath();ctx.moveTo(0,-15);ctx.lineTo(10,10);ctx.lineTo(0,6);ctx.lineTo(-10,10);ctx.closePath();ctx.fillStyle='#fff';ctx.strokeStyle='#1a251b';ctx.lineWidth=3;ctx.fill();ctx.stroke();ctx.restore();
+  if (headingUp) ctx.restore();
 }
