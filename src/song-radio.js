@@ -9,6 +9,11 @@ export const SONGS = {
   'song-village':  { file: 'afro-village.mp3',  title: 'HAPPY AFRICAN VILLAGE', artist: 'John Bartmann' },
   'song-moon':     { file: 'afro-moon.mp3',     title: 'AFRICAN MOON',          artist: 'John Bartmann' },
   'song-west':     { file: 'afro-west.mp3',     title: 'WEST IN AFRICA',        artist: 'John Bartmann' },
+  'song-seeme':    { file: 'hip-when-you-see-me.mp3', title: 'WHEN YOU SEE ME NOW', artist: 'HoliznaRAPS' },
+  'song-greatest': { file: 'hip-greatest-self.mp3',   title: 'GREATEST SELF',       artist: 'FlowForRhythm' },
+  'song-killpain': { file: 'hip-kill-the-pain.mp3',   title: 'KILL THE PAIN',       artist: 'FlowForRhythm' },
+  'song-winning':  { file: 'hip-winning-track.mp3',   title: 'THE WINNING TRACK',   artist: 'FlowForRhythm' },
+  'song-niceday':  { file: 'hip-nice-day.mp3',        title: 'NICE DAY',            artist: 'FlowForRhythm' },
 };
 export const SONG_IDS = Object.keys(SONGS);
 

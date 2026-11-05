@@ -18,7 +18,7 @@ export function loadPreferences(storage) {
       aimAssist: typeof data.aimAssist === 'boolean' ? data.aimAssist : DEFAULTS.aimAssist,
       lookSensitivity: Number.isFinite(value) && value >= 1 && value <= 10 ? value : DEFAULTS.lookSensitivity,
       sfxVolume: volume('sfxVolume'), musicVolume: volume('musicVolume'),
-      musicTrack: ['off','coast','night','harbor','race','missions','song-umlungu','song-kwela','song-iyanetha','song-village','song-moon','song-west'].includes(data.musicTrack) ? data.musicTrack : DEFAULTS.musicTrack,
+      musicTrack: ['off','coast','night','harbor','race','missions','song-umlungu','song-kwela','song-iyanetha','song-village','song-moon','song-west','song-seeme','song-greatest','song-killpain','song-winning','song-niceday'].includes(data.musicTrack) ? data.musicTrack : DEFAULTS.musicTrack,
       graphicsQuality: ['balanced','performance'].includes(data.graphicsQuality) ? data.graphicsQuality : DEFAULTS.graphicsQuality,
     };
   } catch { return { ...DEFAULTS }; }

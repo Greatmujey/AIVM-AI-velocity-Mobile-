@@ -46,3 +46,20 @@ All six are by **John Bartmann**, released under **CC0 1.0 (public domain)** —
 free for any use with no attribution required (credit given here as courtesy).
 Sourced via chosic.com and the SoundSafari/CC0-1.0-Music corpus on GitHub.
 No copyrighted commercial recordings are used anywhere in this project.
+
+## Real hip-hop songs with voices (wave 10)
+
+The "HIP HOP · REAL SONGS WITH VOICES" radio stations play five full vocal
+hip-hop recordings, all **CC0 1.0 (public domain)** via the Free Music Archive
+corpus in SoundSafari/CC0-1.0-Music on GitHub:
+
+| Station | Track | Artist | File |
+| --- | --- | --- | --- |
+| HIP HOP HEAT | When You See Me Now | HoliznaRAPS | `public/assets/music/hip-when-you-see-me.mp3` |
+| FLOW FM | Greatest Self | FlowForRhythm | `public/assets/music/hip-greatest-self.mp3` |
+| FLOW FM | Kill The Pain | FlowForRhythm | `public/assets/music/hip-kill-the-pain.mp3` |
+| FLOW FM | The Winning Track | FlowForRhythm | `public/assets/music/hip-winning-track.mp3` |
+| FLOW FM | Nice Day | FlowForRhythm | `public/assets/music/hip-nice-day.mp3` |
+
+CC0 requires no attribution; credits are listed here as courtesy and for
+provenance. No copyrighted commercial recordings are used in this project.

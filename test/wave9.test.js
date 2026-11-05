@@ -4,13 +4,13 @@ import { SONGS, SONG_IDS, createSongRadio } from '../src/song-radio.js';
 import { loadPreferences, DEFAULTS } from '../src/preferences.js';
 
 test('wave9: six real songs ship on the radio', () => {
-  assert.equal(SONG_IDS.length, 6);
+  assert.equal(SONG_IDS.length, 11);
   const files = SONG_IDS.map(id => SONGS[id].file);
-  assert.equal(new Set(files).size, 6, 'each song has its own file');
+  assert.equal(new Set(files).size, 11, 'each song has its own file');
   for (const id of SONG_IDS) {
     assert.match(id, /^song-/);
-    assert.match(SONGS[id].file, /^afro-.*\.mp3$/);
-    assert.equal(SONGS[id].artist, 'John Bartmann');
+    assert.match(SONGS[id].file, /^(afro|hip)-.*\.mp3$/);
+    assert.ok(['John Bartmann','HoliznaRAPS','FlowForRhythm'].includes(SONGS[id].artist), SONGS[id].artist);
     assert.ok(SONGS[id].title.length > 2);
   }
 });
