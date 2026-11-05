@@ -23,3 +23,7 @@ All assets below are included locally; they are not taken from GTA or Call of Du
 
 - **Online race transport**: [PeerJS](https://github.com/peers/peerjs) by Michelle Bu and Eric Zhang, MIT; included license: `public/assets/licenses/peerjs.txt`. It uses the free public PeerJS signalling service and public STUN servers to open a direct WebRTC data channel between phones; no AIVM server is involved.
 - **Chess rules engine**: [chess.js](https://github.com/jhlywa/chess.js) by Jeff Hlywa, BSD 2-Clause; included license: `public/assets/licenses/chess-js.txt`.
+
+## Original vocal recordings (wave 7)
+
+- `public/assets/audio/vocal-coast.mp3` and `vocal-night.mp3` are original spoken-word vocal hooks written for AIVM and recorded with Arena text-to-speech voices chosen by the project owner. They layer over the generated live-band instrumentation on Coast Drive and Night Cruise. All lyrics are original project writing.

@@ -1401,6 +1401,7 @@ if(import.meta.env.DEV) window.__aivmTest={
   doorTraffic(){return civilians.filter(c=>c.doorful).length},
   lifeStats(){return {...lifeStats}},
   sniperState(){return {sniperActive,scoped,scopeZoom,sway:+currentSway.toFixed(3)}},
+  vocalState(){return music?.vocalState?.()??null},
   startSniper(){startSniperContract()},
   killTarget(){const tget=sniperSpawns.find(e=>e.alive);if(tget)damageEnemy(tget,999)},
   jailState(){return {jailed:jailedUntil>gameTime,left:+Math.max(0,jailedUntil-gameTime).toFixed(1)}},

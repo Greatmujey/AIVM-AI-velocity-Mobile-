@@ -213,9 +213,10 @@ export function createMusic(audio) {
     }
     return barCache.get(key);
   }
-  let vocalBuffer=null, vocalTrack=null, vocalPlaying=false;
-  function setVocal(track, buffer) { vocalTrack = track; vocalBuffer = buffer; vocalPlaying = false }
-  return { setVocal,
+  const vocalBuffers = {};
+  let vocalPlaying = false, vocalNow = null;
+  function setVocal(track, buffer) { vocalBuffers[track] = buffer; vocalPlaying = false }
+  return { setVocal, vocalState() { return { tracks: Object.keys(vocalBuffers), playing: vocalPlaying, current: vocalNow } },
     update(track, volume, muted) {
       const score = TRACKS[track];
       if (!score || muted || volume <= 0 || audio.state !== 'running') { next = 0; lastTrack = track; return }
@@ -231,12 +232,13 @@ export function createMusic(audio) {
           if (play) play(volume)(Math.max(now + .005, swung + (event.offset || 0)), event);
         }
         next += stepLength; step++;
-    if (vocalBuffer && track === vocalTrack && !vocalPlaying && volume > 0 && !muted && sectionOf(bar) === 2 && bar % 8 === 4) {
-      vocalPlaying = true;
+    const vocalBuffer = vocalBuffers[track];
+    if (vocalBuffer && !vocalPlaying && volume > 0 && !muted && sectionOf(bar) === 2 && bar % 4 === 0) {
+      vocalPlaying = true; vocalNow = track;
       const src = audio.createBufferSource(), g = audio.createGain();
       src.buffer = vocalBuffer; g.gain.value = Math.min(1, volume * 2.4);
       src.connect(g); g.connect(audio.destination); src.start(now + .05);
-      src.onended = () => { vocalPlaying = false };
+      src.onended = () => { vocalPlaying = false; vocalNow = null };
     }
       }
       // expose for tests/debug
