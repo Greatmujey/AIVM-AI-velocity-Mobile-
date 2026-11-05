@@ -29,9 +29,9 @@ test('wave9: song station ids survive preferences round-trip', () => {
 test('wave9: song radio stops cleanly for unknown stations', () => {
   // a silent fake audio context — verifies update()/state() bookkeeping
   const ctx = {
-    state: 'running',
+    state: 'running', currentTime: 0,
     destination: {},
-    createGain: () => ({ gain: { value: 1 }, connect() {}, disconnect() {} }),
+    createGain: () => ({ gain: { value: 1, cancelScheduledValues() {}, setValueAtTime() {}, linearRampToValueAtTime() {} }, connect() {}, disconnect() {} }),
     createBufferSource: () => ({ buffer: null, loop: false, connect() {}, start() {}, stop() {}, onended: null, disconnect() {} }),
     decodeAudioData: async () => ({}),
     resume: async () => {},
