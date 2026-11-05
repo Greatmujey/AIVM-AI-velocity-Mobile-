@@ -1,7 +1,7 @@
 // Real-time race transport. PeerJS opens a WebRTC data channel between the
 // host's phone and each joining phone; the room code is the host's peer id, so
 // no server of our own is needed. Only small race messages are sent.
-import { roomPeerId, PEER_PREFIX, normalizeRaceClass } from './race.js';
+import { roomPeerId, PEER_PREFIX } from './race.js';
 
 export { PEER_PREFIX };
 export const ICE_SERVERS = [

@@ -1,6 +1,6 @@
 // Race menus: solo / computer / hosted code / join with code, plus the live
 // race position board. All network work is delegated to the callbacks passed in.
-import { RACE_TRACKS, TRACK_IDS, MAX_RACERS, makeRoomCode, normalizeCode, RACE_CLASSES, RACE_CLASS_IDS, tracksForClass, classOfTrack, normalizeRaceClass, prizeFor } from './race.js';
+import { RACE_TRACKS, MAX_RACERS, makeRoomCode, normalizeCode, RACE_CLASSES, RACE_CLASS_IDS, tracksForClass, classOfTrack, normalizeRaceClass, prizeFor } from './race.js';
 
 const el = (tag, className, text) => { const node = document.createElement(tag); if(className)node.className = className; if(text!==undefined)node.textContent = text; return node };
 
