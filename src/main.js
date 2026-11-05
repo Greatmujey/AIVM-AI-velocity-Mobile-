@@ -8,7 +8,7 @@ import { loadPreferences, savePreferences } from './preferences.js';
 import { advancePursuit } from './pursuit.js';
 import { turnTowards } from './locomotion.js';
 import { LANDMARKS, DISTRICTS, entrance, ROAD_LIMIT, MAP_LETTERS, DISTRICT_LETTERS, mapLetter, landmarkById, districtById, districtAt } from './city-data.js';
-import { vehicleById, applyCatalog, tintFor, handlingFor, dealershipStock, raceClassOf, DEALERSHIP_NAME } from './vehicles.js';
+import { VEHICLE_CATALOG, vehicleById, applyCatalog, tintFor, handlingFor, dealershipStock, raceClassOf, DEALERSHIP_NAME } from './vehicles.js';
 import { createCrowd, stepCrowd, nearestConversations, crowdCount, mulberry32 } from './crowd.js';
 import { applyTalkGesture } from './gestures.js';
 import { createBubbles } from './bubbles.js';
@@ -270,6 +270,74 @@ const JAIL={x:-48,z:-104};
  const sign=new THREE.Mesh(new THREE.BoxGeometry(2.4,.6,.1),new THREE.MeshBasicMaterial({color:0xc9fc51}));sign.position.set(JAIL.x,3.3,JAIL.z+2);jailGroup.add(sign);
  scene.add(jailGroup);
 }
+
+// --- Floating street pickups: health, cash, ammo, nitro, free cars, heat-down.
+// They bob and glow on roadsides all over the city; walk or drive through one
+// to grab it. Grabbed pickups cool down and come back as a random new gift.
+const PICKUP_TYPES={
+ health:{emoji:'❤️',color:0xff5d7a,weight:.2},
+ money:{emoji:'💵',color:0x72e2b6,weight:.24},
+ ammo:{emoji:'🔫',color:0xf0d17d,weight:.14},
+ nitro:{emoji:'🔥',color:0xff9d4f,weight:.16},
+ car:{emoji:'🚗',color:0x8fd0e8,weight:.08},
+ cool:{emoji:'🧊',color:0x9fc0d8,weight:.18},
+};
+const PICKUP_KEYS=Object.keys(PICKUP_TYPES);
+function pickPickupType(){let r=Math.random(),total=0;for(const k of PICKUP_KEYS){total+=PICKUP_TYPES[k].weight;if(r<=total)return k}return 'money'}
+const PICKUP_SPOTS=[];
+for(const rx of [-84,-56,-28,0,28,56,84])for(const rz of [-70,0,70]){
+  const x=rx+5.6,z=rz;
+  if(LANDMARKS.some(place=>Math.hypot(place.x-x,place.z+8-z)<10))continue;
+  PICKUP_SPOTS.push({x,z});
+}
+let pickups=[],nitroUntil=0;
+const pickupTextures={};
+function pickupTexture(type){
+ const c=document.createElement('canvas');c.width=c.height=96;const g=c.getContext('2d');
+ g.fillStyle='#'+PICKUP_TYPES[type].color.toString(16).padStart(6,'0');g.globalAlpha=.3;g.beginPath();g.arc(48,48,44,0,7);g.fill();
+ g.globalAlpha=1;g.font='56px serif';g.textAlign='center';g.textBaseline='middle';g.fillText(PICKUP_TYPES[type].emoji,48,52);
+ const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;return tex;
+}
+function applyPickupLook(pickup){
+ const t=PICKUP_TYPES[pickup.type];
+ pickupTextures[pickup.type]=pickupTextures[pickup.type]||pickupTexture(pickup.type);
+ pickup.sprite.material.map=pickupTextures[pickup.type];pickup.sprite.material.needsUpdate=true;
+ pickup.ring.material.color.setHex(t.color);
+}
+function createPickup(spot){
+ const group=new THREE.Group();
+ const sprite=new THREE.Sprite(new THREE.SpriteMaterial({transparent:true,depthTest:false}));sprite.scale.set(1.5,1.5,1);sprite.position.y=1.35;group.add(sprite);
+ const ring=new THREE.Mesh(new THREE.TorusGeometry(.55,.05,8,28),new THREE.MeshBasicMaterial({color:0xffffff}));ring.rotation.x=-Math.PI/2;ring.position.y=.12;group.add(ring);
+ group.position.set(spot.x,0,spot.z);scene.add(group);
+ const pickup={type:pickPickupType(),group,sprite,ring,seed:Math.random()*7,cooldown:0};
+ applyPickupLook(pickup);
+ return pickup;
+}
+function resetPickup(pickup){pickup.type=pickPickupType();applyPickupLook(pickup);pickup.cooldown=0;pickup.seed=Math.random()*7;pickup.group.visible=true}
+function collectPickup(pickup){
+ if(pickup.type==='health'){health=Math.min(100,health+40);showToast('❤️ HEALTH +40')}
+ else if(pickup.type==='money'){const amount=150+Math.floor(Math.random()*110);reward(progress,amount);saveProgress(storage,progress);refreshCash();showToast(`💵 STREET CASH · +$${amount}`)}
+ else if(pickup.type==='ammo'){ammo.forEach((n,i)=>{ammo[i]=weapons[i].cap});showToast('🔫 FULL AMMO ON EVERY WEAPON')}
+ else if(pickup.type==='nitro'){nitroUntil=gameTime+10;showToast('🔥 NITRO · 10 SECONDS OF SPEED')}
+ else if(pickup.type==='car'){
+  const pool=VEHICLE_CATALOG.filter(entry=>entry.sale&&!ownedVehicles.includes(entry.id));
+  if(pool.length){const entry=pool[Math.floor(Math.random()*pool.length)];ownedVehicles.push(entry.id);saveGarage();const pos=vehicle?vehicle.mesh.position:player.position;const road={x:Math.round(pos.x/28)*28+5.6,z:Math.round(pos.z/28)*28};spawnOwnedVehicle(entry.id,{x:road.x,z:road.z,yaw:0});showToast(`🚗 FREE CAR · ${entry.brand} ${entry.model} ADDED TO YOUR GARAGE · IT IS WAITING ON THE STREET`)}
+  else{reward(progress,500);saveProgress(storage,progress);refreshCash();showToast('🚗 YOU ALREADY OWN THEM ALL · +$500 INSTEAD')}
+ }
+ else if(pickup.type==='cool'){heat=Math.max(0,heat-1);updateHeat();if(heat<2)clearPolice();showToast('🧊 HEAT DOWN · THE COPS COOL OFF')}
+ sound('success');pickup.group.visible=false;pickup.cooldown=gameTime+50;
+}
+function nearestPickup(pos){let best=null,bd=1e9;for(const pickup of pickups){if(pickup.cooldown||!pickup.group.visible)continue;const d=Math.hypot(pos.x-pickup.group.position.x,pos.z-pickup.group.position.z);if(d<bd){bd=d;best=pickup}}return best?{pickup:best,d:bd}:null}
+function updatePickups(dt,pos){
+ for(const pickup of pickups){
+  if(pickup.cooldown){if(gameTime>=pickup.cooldown)resetPickup(pickup);continue}
+  pickup.group.position.y=Math.sin(gameTime*2+pickup.seed)*.22;
+  pickup.sprite.material.rotation+=dt*.8;pickup.ring.rotation.z+=dt*1.4;
+  pickup.ring.scale.setScalar(1+Math.sin(gameTime*3+pickup.seed)*.12);
+  if(!insideHome&&Math.hypot(pos.x-pickup.group.position.x,pos.z-pickup.group.position.z)<2.2)collectPickup(pickup);
+ }
+}
+for(const spot of PICKUP_SPOTS)pickups.push(createPickup(spot));
 
 const weapons=[{name:'PISTOL',cap:12,rate:.32,damage:34,range:28},{name:'ASSAULT RIFLE',cap:30,rate:.12,damage:18,range:34},{name:'SHOTGUN',cap:6,rate:.7,damage:68,range:19},{name:'SMG',cap:36,rate:.09,damage:14,range:26,unlock:'smg'},{name:'MARKSMAN',cap:8,rate:.8,damage:85,range:55,unlock:'sniper'},{name:'REVOLVER',cap:6,rate:.55,damage:60,range:31,unlock:'revolver'},{name:'BATTLE RIFLE',cap:20,rate:.18,damage:29,range:42,unlock:'battle'},{name:'MACHINE GUN',cap:60,rate:.07,damage:12,range:30,auto:true,unlock:'mg'},{name:'BAZOOKA',cap:1,rate:1.9,damage:0,range:70,explosive:true,unlock:'bazooka'}];
 const ammo=weapons.map(w=>w.cap),enemies=[],shots=[],keys={};
@@ -1384,7 +1452,8 @@ function animate(){requestAnimationFrame(animate);const elapsed=clock.getDelta()
    // outruns both, and a pickup turns in slower than a hot hatch.
    const handling=handlingFor(vehicle,{carUpgrade:progress.owned.includes('car')});
    if(vehicle.type==='bike'&&bikeServicedUntil>gameTime){handling.top+=1.6;handling.steer+=.18}
-   vehicleSpeed=advanceVehicleSpeed(vehicleSpeed,acceleration,dt,handling.top*(race?.status==='running'?1.08:1));
+   const nitroOn=nitroUntil>gameTime;
+   vehicleSpeed=advanceVehicleSpeed(vehicleSpeed,acceleration*(nitroOn?1.7:1),dt,handling.top*(race?.status==='running'?1.08:1)*(nitroOn?1.5:1));
    if(Math.abs(vehicleSpeed)>.25)vehicle.mesh.rotation.y-=inputX*dt*handling.steer*(.6+steerSensitivity*.08)*Math.min(Math.abs(vehicleSpeed)/5,1)*(vehicleSpeed>=0?1:-1);
    const dx=-Math.sin(vehicle.mesh.rotation.y)*vehicleSpeed*dt,dz=-Math.cos(vehicle.mesh.rotation.y)*vehicleSpeed*dt;
    if(movePosition(vehicle.mesh.position,dx,dz,drivingObstacles(),.75)<Math.hypot(dx,dz)*.4)vehicleSpeed*=.35;
@@ -1418,7 +1487,7 @@ function animate(){requestAnimationFrame(animate);const elapsed=clock.getDelta()
     person.walk+=dt;person.animElapsed+=dt;
     if(person.animElapsed>=.12){animateWalk(person.mesh,agent.mode==='walk'?.55:0,person.walk,person.animElapsed);person.animElapsed=0}
     if(agent.mode==='talk')applyTalkGesture(person.mesh,gameTime+person.talkPhase,.8);
-  }if(player.userData.model?.userData.gun)player.userData.model.userData.gun.visible=!insideHome;if(aiming&&!vehicle)player.rotation.y=cameraYaw;if(fireHeld&&!insideHome)shoot();if(reloadEnd&&gameTime>=reloadEnd){ammo[weaponIndex]=weapons[weaponIndex].cap;reloadEnd=0}if(!insideHome)updateEnemies(dt);if(!ended&&!insideHome&&missionActive){if(activity)updateSideActivity(Math.min(elapsed,.25));else updateMission();}if(!ended&&!insideHome)updateNavigation();if(!ended&&!insideHome)updateRival(dt);if(!ended){const cityPos=vehicle?vehicle.mesh.position:player.position;updateCity(dt,cityPos);updateAnimals(dt,cityPos);if(!insideHome)updatePolice(dt,cityPos);}if(!ended&&!insideHome&&missionActive&&!activity&&mission===2&&gameTime-lastReinforcement>16&&enemies.filter(e=>e.alive&&e.kind==='pursuer').length<5){const p=vehicle?vehicle.mesh.position:player.position;const z=Math.round(p.z/28)*28;const x=Math.max(-84,Math.min(84,Math.round(p.x/28)*28+(p.x<target.x?-28:28)));spawnEnemy(x,z,'pursuer');lastReinforcement=gameTime;showToast('ENEMY REINFORCEMENTS INBOUND')}
+  }if(player.userData.model?.userData.gun)player.userData.model.userData.gun.visible=!insideHome;if(aiming&&!vehicle)player.rotation.y=cameraYaw;if(fireHeld&&!insideHome)shoot();if(reloadEnd&&gameTime>=reloadEnd){ammo[weaponIndex]=weapons[weaponIndex].cap;reloadEnd=0}if(!insideHome)updateEnemies(dt);if(!ended&&!insideHome&&missionActive){if(activity)updateSideActivity(Math.min(elapsed,.25));else updateMission();}if(!ended&&!insideHome)updateNavigation();if(!ended&&!insideHome)updateRival(dt);if(!ended){const cityPos=vehicle?vehicle.mesh.position:player.position;updateCity(dt,cityPos);updateAnimals(dt,cityPos);updatePickups(dt,cityPos);if(!insideHome)updatePolice(dt,cityPos);}if(!ended&&!insideHome&&missionActive&&!activity&&mission===2&&gameTime-lastReinforcement>16&&enemies.filter(e=>e.alive&&e.kind==='pursuer').length<5){const p=vehicle?vehicle.mesh.position:player.position;const z=Math.round(p.z/28)*28;const x=Math.max(-84,Math.min(84,Math.round(p.x/28)*28+(p.x<target.x?-28:28)));spawnEnemy(x,z,'pursuer');lastReinforcement=gameTime;showToast('ENEMY REINFORCEMENTS INBOUND')}
   for(let i=shots.length-1;i>=0;i--)if(shots[i].until<gameTime){scene.remove(shots[i].line);shots[i].line.geometry.dispose();shots[i].line.material.dispose();shots.splice(i,1)}
   $('hud').classList.toggle('driving',!!vehicle);$('hud').classList.toggle('at-home',insideHome);$('health').textContent=Math.ceil(health);$('health-fill').style.width=Math.max(0,Math.min(100,health))+'%';$('health-fill').style.background=health<30?'#ff6b59':'#c9fc51';$('weapon').textContent=vehicle?`${vehicle.brand||'VEHICLE'} ${vehicle.model||''}`.trim():weapons[weaponIndex].name;$('weapon-sub').textContent=vehicle?`${Math.round(Math.abs(vehicleSpeed)*5)} KM/H · TAP RADIO`:reloadEnd?'RELOADING...':aimAssist?'AIM ASSIST ON':'MANUAL AIM';$('ammo').innerHTML=vehicle?'—':`${ammo[weaponIndex]} <small>/ ∞</small>`;const reloading=!!reloadEnd&&!vehicle;$('reload-track').classList.toggle('visible',reloading);const reloadProgress=reloading?Math.round(Math.max(0,Math.min(1,1-(reloadEnd-gameTime)))*100):0;$('reload-fill').style.width=reloadProgress+'%';$('reload-track').setAttribute('aria-valuenow',String(reloadProgress));$('reload-btn').classList.toggle('selected',reloading);
   const place=insideHome?interiorPlace:nearestPlace(),trafficNear=!insideHome&&!vehicle&&!place?nearestTrafficCar():null;let nearV=null,parkedDistance=5;for(const v of vehicles){const d=player.position.distanceTo(v.mesh.position);if(d<parkedDistance){parkedDistance=d;nearV=v}}const hijack=trafficNear&&player.position.distanceTo(trafficNear.car.mesh.position)<parkedDistance;const near=insideHome||vehicle||place||parkedDistance<5||trafficNear;$('interact-btn').style.display=near?'':'none';const interactVerb=vehicle?(vehicle.type==='bike'?'EXIT BIKE':'EXIT CAR'):insideHome?'OPTIONS':place?placeVerb(place):hijack?'TAKE CAR':nearV?.type==='bike'?'RIDE BIKE':'GET IN CAR';const interactIcon=vehicle?'🚶':(insideHome||place)?(PLACE_ICON[(insideHome?interiorPlace:place)?.id]||'📍'):hijack?'🚕':nearV?.type==='bike'?'🏍️':'🚗';$('interact-btn').querySelector('.ico').textContent=interactIcon;$('interact-btn').querySelector('.lbl').textContent=interactVerb;$('interact-btn').setAttribute('aria-label',vehicle?`Exit the ${vehicle.type}`:insideHome?`${interiorPlace.name} options`:place?`${interactVerb} — ${place.name}`:hijack?'Pull the driver out and take the car':nearV?`Get in the ${nearV.type}`:'Enter the nearby vehicle');$('interaction').style.display=place&&!vehicle?'block':'none';$('interaction').textContent=insideHome?`${interiorPlace.name} · TAP OPTIONS OR EXIT`:place?`${place.name} · TAP ${interactVerb}`:'';$('navigation').style.display=insideHome?'none':'';$('talk-btn').style.display=nearestPerson()&&!place?'':'none';
@@ -1461,6 +1530,8 @@ if(import.meta.env.DEV) window.__aivmTest={
   interactLabel(){return $('interact-btn').querySelector('.lbl').textContent},
   interactIcon(){return $('interact-btn').querySelector('.ico').textContent},
   parkedVehicles(){return vehicles.map(v=>({type:v.type,x:+v.mesh.position.x.toFixed(1),z:+v.mesh.position.z.toFixed(1)}))},
+  pickupsState(){const pos=vehicle?vehicle.mesh.position:player.position;const near=nearestPickup(pos);return {total:pickups.length,visible:pickups.filter(p=>!p.cooldown).length,nitro:nitroUntil>gameTime,nitroLeft:+Math.max(0,nitroUntil-gameTime).toFixed(1),nearest:near?{type:near.pickup.type,x:+near.pickup.group.position.x.toFixed(1),z:+near.pickup.group.position.z.toFixed(1),d:+near.d.toFixed(1)}:null}},
+  retagNearestPickup(type){const pos=vehicle?vehicle.mesh.position:player.position;const near=nearestPickup(pos);if(!near||!PICKUP_TYPES[type])return null;near.pickup.type=type;applyPickupLook(near.pickup);return {type:near.pickup.type,x:+near.pickup.group.position.x.toFixed(1),z:+near.pickup.group.position.z.toFixed(1)}},
   forceBust(){bustPlayer()},
   hostileCount(){return civilians.filter(c=>c.hostileUntil>gameTime&&!c.dead).length},
   arcadeAward(){return arcadeAwardLog.slice()},
